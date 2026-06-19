@@ -212,13 +212,21 @@ export default function PathMapperApp() {
   const [pipeline, setPipeline] = useState<PipelineState>(INITIAL);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [typingPersona, setTypingPersona] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const timeoutRefs = useRef<any[]>([]);
 
   const addMsg = useCallback((msg: Omit<ChatMessage, "id" | "timestamp">) =>
     setMessages(prev => [...prev, { ...msg, id: crypto.randomUUID(), timestamp: Date.now() }]), []);
+
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(clearTimeout);
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -226,7 +234,7 @@ export default function PathMapperApp() {
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isLoading || typingPersona) return;
 
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -234,6 +242,7 @@ export default function PathMapperApp() {
     setError(null);
     addMsg({ role: "user", content: trimmed });
     setIsLoading(true);
+    setTypingPersona(null);
 
     try {
       const res = await fetch("/api/chat", {
@@ -248,6 +257,17 @@ export default function PathMapperApp() {
         throw new Error(data.detail ?? data.error ?? `Server error ${res.status}`);
       }
 
+      setIsLoading(false);
+
+      const targetPersona = data.message?.persona || "Sam";
+      setTypingPersona(targetPersona);
+
+      await new Promise<void>(resolve => {
+        const id = setTimeout(resolve, 1500);
+        timeoutRefs.current.push(id);
+      });
+
+      setTypingPersona(null);
       setPipeline(data.state);
 
       if (data.message) {
@@ -262,70 +282,53 @@ export default function PathMapperApp() {
 
       // Stance comes as a second message after narratives
       if (data.message?.type === "narratives" && data.state?.stance) {
-        setTimeout(() => {
-          addMsg({
-            role: "system",
-            content: data.state.stance.lean,
-            persona: data.message.persona,
-            type: "stance",
-            metadata: { stance: data.state.stance },
-          });
-        }, 700);
+        setTypingPersona(targetPersona);
+
+        await new Promise<void>(resolve => {
+          const id = setTimeout(resolve, 1500);
+          timeoutRefs.current.push(id);
+        });
+
+        setTypingPersona(null);
+
+        addMsg({
+          role: "system",
+          content: data.state.stance.lean,
+          persona: data.message.persona,
+          type: "stance",
+          metadata: { stance: data.state.stance },
+        });
       }
     } catch (err) {
+      setIsLoading(false);
+      setTypingPersona(null);
       const msg = err instanceof Error ? err.message : "Unknown error";
       setError(`Something went wrong: ${msg}`);
       console.error("Send error:", err);
-    } finally {
-      setIsLoading(false);
     }
-  }, [pipeline, isLoading, addMsg]);
+  }, [pipeline, isLoading, typingPersona, addMsg]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
   };
 
-  const reset = () => { setMessages([]); setPipeline(INITIAL); setStarted(false); setInput(""); setError(null); };
+  const reset = () => {
+    timeoutRefs.current.forEach(clearTimeout);
+    timeoutRefs.current = [];
+    setMessages([]);
+    setPipeline(INITIAL);
+    setStarted(false);
+    setInput("");
+    setError(null);
+    setTypingPersona(null);
+  };
 
   const isDone = pipeline.phase === "done";
   const placeholder = pipeline.phase === "pre_friend" || pipeline.phase === "pre_friend_waiting"
     ? "Describe the decision you're facing..."
     : "Your response...";
 
-  // Determine typing persona
-  const getTypingPersona = (phase: PipelinePhase, pendingType: string | null) => {
-    if (phase === "pre_friend" || phase === "pre_friend_waiting") return "Sam";
-    if (phase === "narratives" || phase === "scores" || phase === "stance") {
-      if (pipeline.resolved_premises.length > 0) {
-        const lastPremise = pipeline.resolved_premises[pipeline.resolved_premises.length - 1];
-        if (lastPremise.checkpoint_type) {
-          const map: Record<string, string> = {
-            contradiction: "Dev",
-            bundling: "Theo",
-            repetition: "Mina",
-            hedging: "Priya",
-            omission: "Jordan",
-          };
-          return map[lastPremise.checkpoint_type] || "Dev";
-        }
-      }
-      return pipeline.pre_friend_turns > 0 ? "Sam" : "Dev";
-    }
-    if (pendingType) {
-      const map: Record<string, string> = {
-        contradiction: "Dev",
-        bundling: "Theo",
-        repetition: "Mina",
-        hedging: "Priya",
-        omission: "Jordan",
-      };
-      return map[pendingType] || "Dev";
-    }
-    return "Dev";
-  };
-
-  const typingPersona = getTypingPersona(pipeline.phase, pipeline.pending_checkpoint_type);
-  const typingConfig = PERSONAS[typingPersona as keyof typeof PERSONAS] || PERSONAS.Sam;
+  const typingConfig = typingPersona ? (PERSONAS[typingPersona as keyof typeof PERSONAS] || PERSONAS.Sam) : PERSONAS.Sam;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", maxWidth: 800, margin: "0 auto", background: "#0F0F16", color: "#E8E4DC", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -350,7 +353,7 @@ export default function PathMapperApp() {
           : messages.map(msg => <ChatBubble key={msg.id} msg={msg} />)
         }
 
-        {isLoading && (
+        {typingPersona && (
           <div style={{ display: "flex", gap: 10, alignSelf: "flex-start", maxWidth: "92%" }}>
             <div style={{
               width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",

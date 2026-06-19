@@ -7,7 +7,7 @@
 // ⚠️  Model used is gemini-1.5-flash, NOT gemini-2.0-flash.
 //     gemini-2.0-flash has limit:0 on most free API keys.
 
-const GEMINI_MODEL = "gemini-1.5-flash";
+const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -52,11 +52,11 @@ async function callGroq(options: LLMCallOptions): Promise<string> {
       model: "llama-3.3-70b-versatile",   // best quality on Groq free tier
       messages: [
         { role: "system", content: options.systemPrompt },
-        { role: "user",   content: options.userMessage },
+        { role: "user", content: options.userMessage },
       ],
       ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
       temperature: options.temperature ?? 0.3,
-      max_tokens:  options.maxTokens ?? 1024,
+      max_tokens: options.maxTokens ?? 1024,
     }),
   });
 
@@ -83,9 +83,9 @@ async function callGemini(options: LLMCallOptions): Promise<string> {
       systemInstruction: { parts: [{ text: options.systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: options.userMessage }] }],
       generationConfig: {
-        temperature:     options.temperature ?? 0.3,
+        temperature: options.temperature ?? 0.3,
         maxOutputTokens: options.maxTokens ?? 1024,
-        responseMimeType: "application/json",
+        ...(options.jsonMode ? { responseMimeType: "application/json" } : {}),
       },
     }),
   });
@@ -104,8 +104,65 @@ async function callGemini(options: LLMCallOptions): Promise<string> {
   return text.trim();
 }
 
+interface VerificationResult {
+  satisfied: boolean;
+  feedback: string;
+}
+
+async function verifyResponseWithGemini(
+  options: LLMCallOptions,
+  generatedResponse: string
+): Promise<VerificationResult> {
+  const verificationSystemPrompt = `
+You are an expert AI editor and critic. Your job is to verify whether a generated response satisfies the instructions, tone guidelines, and safety rules of the original prompt.
+
+Evaluate the generated response against these criteria:
+1. Empathy & Tone: It must sound like a warm, supportive, authentic human friend in a WhatsApp chat group. It should NOT sound like an AI, an analyst, or a data-driven report. It must avoid corporate, clinical, analytical, or robotic terms.
+2. Character Accuracy: It must be in the correct friend's persona (if specific persona guidance is provided in the prompt).
+3. Value Alignment: It must accurately address the user's message/original context.
+4. Constraints: It must respect length and formatting constraints (e.g., 2-3 sentences max, no preambles, no quotes, no markdown headers).
+
+You must respond in JSON format with exactly these two keys:
+- "satisfied": boolean (true if the response is excellent and ready to send, false if it has issues)
+- "feedback": string (if not satisfied, describe exactly what the generator must fix or rewrite. Be specific. If satisfied, keep this field empty).
+`.trim();
+
+  const verificationUserMessage = `
+Original System Instructions:
+"""
+${options.systemPrompt}
+"""
+
+Original User Message:
+"""
+${options.userMessage}
+"""
+
+Generated Response to Verify:
+"""
+${generatedResponse}
+"""
+`.trim();
+
+  try {
+    const rawResult = await callGemini({
+      systemPrompt: verificationSystemPrompt,
+      userMessage: verificationUserMessage,
+      jsonMode: true,
+      temperature: 0.1,
+      maxTokens: 500,
+    });
+
+    const parsed = JSON.parse(extractJSON(rawResult)) as VerificationResult;
+    return parsed;
+  } catch (err) {
+    console.error("Gemini verification failed:", err);
+    return { satisfied: true, feedback: "" };
+  }
+}
+
 // ─── Public: callLLM ──────────────────────────────────────────────────────────
-// provider "auto" = try Groq first, fall back to Gemini on any error
+// provider "auto" = Groq primary generator with Gemini verification loop, up to 2 revisions
 export async function callLLM(options: LLMCallOptions): Promise<string> {
   const provider = options.provider ?? "auto";
 
@@ -116,11 +173,51 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     return stripFences(await callGemini(options));
   }
 
-  // "auto" — Groq first, Gemini fallback
+  // "auto" — Groq first, Gemini verification loop
   try {
-    return stripFences(await callGroq(options));
+    let currentOptions = { ...options };
+    let currentResponse = "";
+    const maxRevisions = 2;
+    const delayBetweenCallsMs = 800;
+
+    for (let revision = 0; revision <= maxRevisions; revision++) {
+      currentResponse = stripFences(await callGroq(currentOptions));
+
+      // JSON modes (signals/metadata extraction) don't need critic evaluation
+      if (options.jsonMode) {
+        return currentResponse;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayBetweenCallsMs));
+
+      const check = await verifyResponseWithGemini(options, currentResponse);
+      console.log(`[LLM Loop] Verification attempt ${revision + 1}/${maxRevisions + 1}: satisfied=${check.satisfied}, feedback="${check.feedback}"`);
+
+      if (check.satisfied) {
+        return currentResponse;
+      }
+
+      if (revision < maxRevisions) {
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenCallsMs));
+
+        currentOptions.userMessage = `
+${options.userMessage}
+
+---
+Note: You previously generated this draft:
+"${currentResponse}"
+
+However, a reviewer noticed the following issues that you must correct:
+"${check.feedback}"
+
+Please rewrite your response to fix these issues. Ensure it is warm, casual, in character, and follows all original instructions. Do NOT reference the reviewer. Speak directly to the user.
+`.trim();
+      }
+    }
+
+    return currentResponse;
   } catch (groqErr) {
-    console.warn("Groq failed, falling back to Gemini:", (groqErr as Error).message);
+    console.warn("Groq loop failed, falling back directly to Gemini:", (groqErr as Error).message);
     return stripFences(await callGemini(options));
   }
 }
