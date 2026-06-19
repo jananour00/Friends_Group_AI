@@ -1,15 +1,15 @@
 # PathMapper v1.2
 ### USAII Global AI Hackathon 2026 — Undergraduate Track, Brief 3
 
-> **PathMapper** is an AI-powered life decision simulator that helps users unpack complex career or life dilemmas, resolving reasoning biases and contradictions through a group-chat style interaction before mapping two contrasting paths.
+PathMapper is an AI-powered life decision simulator that helps users unpack complex career or life dilemmas. It resolves reasoning biases and contradictions through a group-chat style interaction before mapping two contrasting future paths.
 
 ---
 
-## 🚀 Quick Start (5 minutes)
+## Quick Start (5 minutes)
 
 ### 1. Get Free API Keys
-* **Gemini API Key** → Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey)
-* **Groq API Key** *(Optional)* → Get a key at [Groq Console](https://console.groq.com/keys) (The application will automatically fall back to Gemini if your Groq key is rate-limited or missing).
+* Gemini API Key: Get a free key at https://aistudio.google.com/app/apikey
+* Groq API Key (Optional): Get a key at https://console.groq.com/keys (The application automatically falls back to Gemini if your Groq key is rate-limited or missing).
 
 ### 2. Install & Run
 
@@ -38,62 +38,105 @@ npx vercel
 
 ---
 
-## 🛠️ Architecture & Core Pipelines
+## Detailed System Architecture
+
+PathMapper uses a stateful, dual-model (Groq + Gemini) architecture to guide users through a structured reasoning analysis. The application is built with Next.js 14, React, and TypeScript. All logic is run on the server side in a single request/response cycle to eliminate latency and cross-origin issues.
+
+### 1. Client-Side Presentation Layer (app/page.tsx)
+The frontend simulates a WhatsApp group chat with a team of supportive AI friends:
+* Sam (the Gatekeeper): Guides the initial intake phase.
+* Dev (the Straight Shooter): Challenges contradictions in logic.
+* Mina (the Noticer): Points out repetition and emotional cues.
+* Theo (the Organizer): Untangles bundled premises.
+* Priya (the Steady Encourager): Checks for hedging and wishful thinking.
+* Jordan (the Curious One): Investigates omissions and unaddressed variables.
+
+#### Core Frontend Mechanics:
+* State Orchestration: The frontend acts as a rendering loop, sending the current PipelineState and the user's latest message to the backend API, and rendering the updated state.
+* Delayed Typing Simulation: To maintain conversational flow, when a backend response is returned, the client parses the selected sender persona and displays a matching typing indicator for exactly 1500 milliseconds before displaying the message. This eliminates mismatches where the typing indicator would show one friend while a different friend sent the message.
+* Dynamic Visuals: Rendered scoreboards and narrative cards update dynamically based on the state payload.
+
+### 2. Server-Side Execution Pipeline (app/api/chat/route.ts)
+The `/api/chat` POST route takes the user's message and the current client state, then runs the appropriate state-machine phase functions:
 
 ```
-User Input
-  │
-  ├──► Step 1: Richness Gate (Gemini 2.0)
-  │            Verifies input depth. Prompts user for missing signals if needed.
-  │
-  ├──► Step 2: Signal Extraction (Groq/Gemini)
-  │            Identifies contradictions, bundling, repetition, hedging, and omissions.
-  │
-  ├──► Step 3: Checkpoint Selection
-  │            Selects the highest-priority reasoning checkpoint to address.
-  │
-  ├──► Step 4: Actor-Critic Response Loop (Groq + Gemini Critic)
-  │            Groq generates the draft message. Gemini evaluates the tone:
-  │              - If robotic/clinical: Gemini requests revision with feedback (up to 2 times).
-  │              - If human & empathetic: Approved and sent.
-  │
-  ├──► Step 5: Path Narratives (Gemini 2.0)
-  │            Constructs two vivid first-person future paths.
-  │
-  ├──► Step 6: Path Scoring & Stance (TypeScript + Gemini)
-  │            Scores paths across 5 dimensions and delivers a final advice stance.
+[User Input Received]
+         │
+         ▼
+[Phase 1: Pre-Friend (Richness Gate)] ── (Lacks Signals) ──► [Ask Pre-Friend Question] ──► (Client)
+         │ (All Signals Present)
+         ▼
+[Phase 2: Signal Extraction]
+         │ (Extracts Values, Paths, Stated Factors)
+         ▼
+[Phase 3: Checkpoint Selection] ──────── (Checkpoint Found) ─► [Actor-Critic Response Loop] ──► (Client)
+         │ (All Checkpoints Addressed)
+         ▼
+[Phase 4: Narrative Generation]
+         │ (Generates Future Path A & Path B)
+         ▼
+[Phase 5: Path Scoring]
+         │ (Scores 5 Dimensions via TypeScript)
+         ▼
+[Phase 6: Stance Evaluation] ──────────────────────────────► [Render Narratives & Stance] ──► (Client)
 ```
-
-### Key Technical Enhancements:
-
-* **Groq-to-Gemini Actor-Critic Loop:** For conversational turns, Groq acts as the generator for speed, while Gemini acts as an editorial critic (`verifyResponseWithGemini`) evaluating style constraints (WhatsApp casual tone, max 2-3 sentences, empathy). Gemini can reject and request up to **2 revisions** with feedback.
-* **Stable Production Fallback:** Powered by `gemini-2.0-flash` with strict JSON mode configurations (`responseMimeType: "application/json"`) to prevent early truncation, safety recitation filters, or markdown syntax failures when fallback is active.
-* **Typing Indicator Sync:** The frontend simulates typing for the **exact friend** who sent the message (Dev, Mina, Theo, Priya, Jordan) for 1.5 seconds before rendering their chat bubble, aligning the UI animation with the chat participant.
-* **Single Route Server Execution:** Evaluates all steps server-side under `/api/chat` to eliminate redundant HTTP hops, 405 CORS issues, and state mismatch.
 
 ---
 
-## ⚙️ Environment Variables
+## How It Works: Phase by Phase
+
+### Phase 1: Pre-Friend Richness Gate
+* Logic: When a user enters their dilemma, the backend calls `runPreFriendRichness` to check for five essential decision dimensions (financial trajectory, growth, values alignment, social capital, stability).
+* Prompting: If any priority dimensions are missing, the assistant asks follow-up questions (maximum 3 turns) to extract this context before entering the main loop.
+
+### Phase 2: Signal Extraction
+* Logic: The combined user input is processed by `runExtraction` to produce a structured JSON metadata block representing:
+  - Stated values (e.g. money, security, freedom)
+  - Path options (e.g. corporate job vs. startup)
+  - Core variables (e.g. relocation, marriage)
+
+### Phase 3: Checkpoint Loop
+* Logic: The backend evaluates the extracted data and conversation history against five reasoning checkpoints:
+  1. Contradiction (Dev): Highlighting conflicting goals (e.g. wanting high wealth but refusing high-growth risks).
+  2. Bundling (Theo): Separating independent decisions (e.g. separating the career choice from a marriage timeline).
+  3. Repetition (Mina): Pointing out emotional fixation on single terms (e.g. money).
+  4. Hedging (Priya): Addressing non-committal or passive stances.
+  5. Omission (Jordan): Bringing up variables the user omitted but implied.
+* Resolution: For each active checkpoint, the associated friend asks a target question. The user's answer is evaluated by `runResolvePremise` and marked as resolved.
+
+### Phase 4: Actor-Critic Response Loop (Groq + Gemini Critic)
+For conversational turns, PathMapper runs a generator-critic loop (`callLLM`):
+* Actor (Groq): Calls the primary generator (`llama-3.3-70b-versatile`) to draft the response in the selected friend's persona.
+* Critic (Gemini): Evaluates the draft using a verification prompt checking for casual WhatsApp style, empathy, length constraints, and robotic/clinical keywords.
+* Revisions: If the Critic is unsatisfied, the Actor is called again with the Critic's specific feedback. This loop runs for a maximum of 2 revisions to avoid latency.
+* Fallback: If Groq hits a 429 rate limit, the loop falls back automatically to Gemini (`gemini-2.0-flash`), which is configured with strict JSON mode configurations (`responseMimeType: "application/json"`) to ensure JSON integrity.
+
+### Phase 5: Narrative Generation & Path Scoring
+* Narratives: Once all checkpoints are cleared, `runNarrativeGeneration` uses Gemini to construct two vivid, realistic future scenarios (Path A and Path B) that are directly bound by the resolved premises.
+* Scoring: A deterministic TypeScript scoring system (`scorePaths`) evaluates the paths against the five core dimensions based on the conversation's resolved premises, outputting a clear numerical comparison (out of 25).
+
+### Phase 6: Stance Evaluation
+* Final Lean: Gemini evaluates the scored paths to formulate an overall recommended lean and a "flip condition" (e.g. what would have to change for the other path to win).
+* Human Agency Handback: To ensure ethical AI, the loop concludes with a direct handback outlining what variables only the user can decide, reinforcing human agency.
+
+---
+
+## Environment Variables
 
 Copy `.env.local.template` to `.env` and fill in the values:
 
 ```env
-# -----------------------------------------------------------------------------
 # API Keys (Required)
-# -----------------------------------------------------------------------------
 GEMINI_API_KEY=AIzaSy...           # Get free at https://aistudio.google.com
 GROQ_API_KEY=gsk_...               # Get free at https://console.groq.com
 
-# -----------------------------------------------------------------------------
 # App configuration
-# -----------------------------------------------------------------------------
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
 ---
 
-## 🤝 Responsible AI
+## Responsible AI & Mitigations
 
-* **Risk:** Users may treat PathMapper's lean advice as a definitive choice.
-* **Mitigation:** The advisor persona always terminates the session with an explicit "handback" stating exactly what only the human agent can decide.
-* **Human-in-the-Loop:** PathMapper acts as a mirror highlighting trade-offs rather than providing final decisions.
+* Mitigation of Bias: The advisor persona always terminates the session with an explicit handback statement to ensure users do not treat the AI's lean as an absolute instruction.
+* Human-in-the-Loop Design: Dimension weights and tradeoff balances are derived directly from the user's answers, serving as a reflection tool rather than an automated decision maker.
