@@ -19,6 +19,7 @@ interface LLMCallOptions {
   userMessage: string;
   maxTokens?: number;
   temperature?: number;
+  jsonMode?: boolean;
 }
 
 // ─── Strip markdown fences ────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ async function callGroq(options: LLMCallOptions): Promise<string> {
         { role: "system", content: options.systemPrompt },
         { role: "user",   content: options.userMessage },
       ],
+      ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
       temperature: options.temperature ?? 0.3,
       max_tokens:  options.maxTokens ?? 1024,
     }),
@@ -132,7 +134,7 @@ export async function callLLMJSON<T>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const raw = await callLLM(options);
+      const raw = await callLLM({ ...options, jsonMode: true });
       return JSON.parse(extractJSON(raw)) as T;
     } catch (err) {
       lastError = err;

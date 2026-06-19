@@ -1,52 +1,51 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { ChatMessage, DimensionScores, NarrativeOutput, ScoringOutput, StanceOutput } from "@/types/pipeline";
-
-type PipelinePhase = "input" | "checkpoint_loop" | "awaiting_user" | "narratives" | "scores" | "done";
-
-interface PipelineState {
-  raw_input: string;
-  extraction: unknown;
-  resolved_premises: unknown[];
-  current_checkpoint: unknown;
-  narratives: NarrativeOutput | null;
-  scores: ScoringOutput | null;
-  stance: StanceOutput | null;
-  phase: PipelinePhase;
-  pending_question: string | null;
-  pending_checkpoint_type: string | null;
-}
+import type { ChatMessage, DimensionScores, NarrativeOutput, ScoringOutput, StanceOutput, PipelinePhase, PipelineState } from "@/types/pipeline";
 
 const INITIAL: PipelineState = {
   raw_input: "",
+  consolidated_input: "",
+  pre_friend_metadata: null,
+  pre_friend_turns: 0,
   extraction: null,
   resolved_premises: [],
   current_checkpoint: null,
   narratives: null,
   scores: null,
   stance: null,
-  phase: "input",
+  phase: "pre_friend",
   pending_question: null,
   pending_checkpoint_type: null,
 };
 
 const PERSONAS = {
-  "The Listener": { color: "#5B8A6A", bg: "#1a2e22", emoji: "🌿" },
-  "The Analyst":  { color: "#4A7FBF", bg: "#1a2338", emoji: "🧭" },
-  "The Advisor":  { color: "#B08A5A", bg: "#2a1f10", emoji: "🔑" },
+  Sam: { color: "#8A8A9A", bg: "#16161F", emoji: "💬", subtitle: "the Gatekeeper" },
+  Dev: { color: "#E06B4E", bg: "#2A1512", emoji: "🎯", subtitle: "the Straight Shooter" },
+  Mina: { color: "#D4839A", bg: "#2A1520", emoji: "🌸", subtitle: "the Noticer" },
+  Theo: { color: "#4AAAA5", bg: "#122A28", emoji: "📋", subtitle: "the Organizer" },
+  Priya: { color: "#9B7ED8", bg: "#1E162A", emoji: "🌙", subtitle: "the Steady Encourager" },
+  Jordan: { color: "#D4A843", bg: "#2A2210", emoji: "⚡", subtitle: "the Curious One" },
 } as const;
 
+const dimLabels: Record<string, string> = {
+  financial_trajectory: "Financial Trajectory",
+  growth_rate: "Growth Rate",
+  values_alignment: "Values Alignment",
+  social_capital: "Social Capital",
+  stability: "Stability",
+};
+
 // ─── Score Bars ───────────────────────────────────────────────────────────────
-function ScoreBar({ label, a, b, labelA, labelB }: { label: string; a: number; b: number; labelA: string; labelB: string }) {
+function ScoreBar({ label, a, b }: { label: string; a: number; b: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <div style={{ fontSize: 11, color: "#666", width: 64, flexShrink: 0 }}>{label}</div>
+      <div style={{ fontSize: 11, color: "#999", width: 120, flexShrink: 0 }}>{label}</div>
       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
         <div style={{ flex: 1, height: 6, background: "#1E1E2E", borderRadius: 3, overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${(a / 5) * 100}%`, background: "#3A6A9C", borderRadius: 3, transition: "width 0.6s ease" }} />
         </div>
-        <div style={{ fontSize: 10, color: "#555", width: 28, textAlign: "center", flexShrink: 0 }}>{a}:{b}</div>
+        <div style={{ fontSize: 10, color: "#777", width: 28, textAlign: "center", flexShrink: 0 }}>{a}:{b}</div>
         <div style={{ flex: 1, height: 6, background: "#1E1E2E", borderRadius: 3, overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${(b / 5) * 100}%`, background: "#9C7A3A", borderRadius: 3, transition: "width 0.6s ease" }} />
         </div>
@@ -59,22 +58,27 @@ function ScoreBar({ label, a, b, labelA, labelB }: { label: string; a: number; b
 function NarrativeCards({ narratives, scores }: { narratives: NarrativeOutput; scores: ScoringOutput }) {
   const totalA = Object.values(scores.path_a).reduce((s, v) => s + v, 0);
   const totalB = Object.values(scores.path_b).reduce((s, v) => s + v, 0);
-  const dims = ["financial", "growth", "values", "social", "stability"] as Array<keyof DimensionScores>;
+  const dims = ["financial_trajectory", "growth_rate", "values_alignment", "social_capital", "stability"] as Array<keyof DimensionScores>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Path cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {[
-          { label: narratives.path_a_label, path: narratives.path_a, color: "#4A7FBF", bg: "#0d1a2a" },
-          { label: narratives.path_b_label, path: narratives.path_b, color: "#B08A5A", bg: "#1a1200" },
-        ].map(({ label, path, color, bg }) => (
+          { label: narratives.path_a_label, path: narratives.path_a, color: "#4A7FBF", bg: "#0d1a2a", note: scores.social_capital_note_a },
+          { label: narratives.path_b_label, path: narratives.path_b, color: "#B08A5A", bg: "#1a1200", note: scores.social_capital_note_b },
+        ].map(({ label, path, color, bg, note }) => (
           <div key={label} style={{ background: bg, border: `1px solid ${color}33`, borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color, marginBottom: 8 }}>{label}</div>
             <p style={{ fontSize: 13, lineHeight: 1.6, color: "#C0B8AC", margin: "0 0 10px" }}>{path.body}</p>
-            <div style={{ fontSize: 11, color: "#555", background: "#0a0a10", borderRadius: 6, padding: "6px 10px", lineHeight: 1.5 }}>
-              <span style={{ fontWeight: 600, color: "#777" }}>Flip if: </span>{path.flip_condition}
+            <div style={{ fontSize: 11, color: "#888", background: "#0a0a10", borderRadius: 6, padding: "6px 10px", lineHeight: 1.5, marginBottom: note ? 8 : 0 }}>
+              <span style={{ fontWeight: 600, color: "#aaa" }}>Flip if: </span>{path.flip_condition}
             </div>
+            {note && (
+              <div style={{ fontSize: 10, color: "#C08A3E", background: "#2A1F10", padding: "6px 10px", borderRadius: 6, lineHeight: 1.4 }}>
+                ⚠️ {note}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -87,7 +91,7 @@ function NarrativeCards({ narratives, scores }: { narratives: NarrativeOutput; s
           <span style={{ color: "#B08A5A", textTransform: "uppercase", letterSpacing: "0.5px" }}>{narratives.path_b_label}</span>
         </div>
         {dims.map((d) => (
-          <ScoreBar key={d} label={d.charAt(0).toUpperCase() + d.slice(1)} a={scores.path_a[d]} b={scores.path_b[d]} labelA={narratives.path_a_label} labelB={narratives.path_b_label} />
+          <ScoreBar key={d} label={dimLabels[d] || d} a={scores.path_a[d]} b={scores.path_b[d]} />
         ))}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, paddingTop: 10, borderTop: "1px solid #1E1E2E", fontSize: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 14, color: "#4A7FBF" }}>{totalA}/25</span>
@@ -143,7 +147,9 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {!isUser && msg.persona && (
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.3px", marginLeft: 2, color: persona?.color }}>{msg.persona}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.3px", marginLeft: 2, color: persona?.color }}>
+            {msg.persona}
+          </div>
         )}
         <div style={{
           padding: "12px 16px",
@@ -173,9 +179,10 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
 // ─── Welcome Screen ───────────────────────────────────────────────────────────
 function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
   const examples = [
-    "I'm deciding whether to stay at my current job or join a startup. The startup pays less but has equity and faster growth.",
-    "Should I move to Dubai for a better salary or stay close to family in Cairo? My partner's situation complicates things.",
-    "I'm torn between doing a master's degree or just working — I love learning but I need income now.",
+    { label: "I'm deciding whether to stay at my current job or join a startup. The startup pays less but has equity and faster growth.", value: "I'm deciding whether to stay at my current job or join a startup. The startup pays less but has equity and faster growth." },
+    { label: "Should I move to Dubai for a better salary or stay close to family in Cairo? My partner's situation complicates things.", value: "Should I move to Dubai for a better salary or stay close to family in Cairo? My partner's situation complicates things." },
+    { label: "I'm torn between doing a master's degree or just working — I love learning but I need income now.", value: "I'm torn between doing a master's degree or just working — I love learning but I need income now." },
+    { label: "🧪 Test Case: Trigger all 5 friend checkpoints (Dev, Mina, Theo, Priya, Jordan)", value: "[TEST-ALL] I am trying to make a big decision: should I stay at my stable corporate job or join an early-stage startup? I guess maybe both options are good, but I keep thinking about the money, money, money. Also, I need to decide if I want to get married next year or move to Europe." },
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 20px", textAlign: "center", gap: 12 }}>
@@ -185,14 +192,14 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
       <div style={{ marginTop: 16, width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 8 }}>
         <p style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.8px", margin: "0 0 4px" }}>Try one of these:</p>
         {examples.map((ex, i) => (
-          <button key={i} onClick={() => onSend(ex)} style={{
+          <button key={i} onClick={() => onSend(ex.value)} style={{
             background: "#161622", border: "1px solid #2A2A3E", color: "#B0A898",
             padding: "12px 16px", borderRadius: 10, textAlign: "left", fontSize: 13, lineHeight: 1.5,
             cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit"
           }}
             onMouseEnter={e => { (e.target as HTMLElement).style.borderColor = "#5B8A6A"; (e.target as HTMLElement).style.color = "#E8E4DC"; }}
             onMouseLeave={e => { (e.target as HTMLElement).style.borderColor = "#2A2A3E"; (e.target as HTMLElement).style.color = "#B0A898"; }}
-          >{ex}</button>
+          >{ex.label}</button>
         ))}
       </div>
     </div>
@@ -259,7 +266,7 @@ export default function PathMapperApp() {
           addMsg({
             role: "system",
             content: data.state.stance.lean,
-            persona: "The Advisor",
+            persona: data.message.persona,
             type: "stance",
             metadata: { stance: data.state.stance },
           });
@@ -281,7 +288,44 @@ export default function PathMapperApp() {
   const reset = () => { setMessages([]); setPipeline(INITIAL); setStarted(false); setInput(""); setError(null); };
 
   const isDone = pipeline.phase === "done";
-  const placeholder = pipeline.phase === "input" ? "Describe the decision you're facing..." : "Your response...";
+  const placeholder = pipeline.phase === "pre_friend" || pipeline.phase === "pre_friend_waiting"
+    ? "Describe the decision you're facing..."
+    : "Your response...";
+
+  // Determine typing persona
+  const getTypingPersona = (phase: PipelinePhase, pendingType: string | null) => {
+    if (phase === "pre_friend" || phase === "pre_friend_waiting") return "Sam";
+    if (phase === "narratives" || phase === "scores" || phase === "stance") {
+      if (pipeline.resolved_premises.length > 0) {
+        const lastPremise = pipeline.resolved_premises[pipeline.resolved_premises.length - 1];
+        if (lastPremise.checkpoint_type) {
+          const map: Record<string, string> = {
+            contradiction: "Dev",
+            bundling: "Theo",
+            repetition: "Mina",
+            hedging: "Priya",
+            omission: "Jordan",
+          };
+          return map[lastPremise.checkpoint_type] || "Dev";
+        }
+      }
+      return pipeline.pre_friend_turns > 0 ? "Sam" : "Dev";
+    }
+    if (pendingType) {
+      const map: Record<string, string> = {
+        contradiction: "Dev",
+        bundling: "Theo",
+        repetition: "Mina",
+        hedging: "Priya",
+        omission: "Jordan",
+      };
+      return map[pendingType] || "Dev";
+    }
+    return "Dev";
+  };
+
+  const typingPersona = getTypingPersona(pipeline.phase, pipeline.pending_checkpoint_type);
+  const typingConfig = PERSONAS[typingPersona as keyof typeof PERSONAS] || PERSONAS.Sam;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", maxWidth: 800, margin: "0 auto", background: "#0F0F16", color: "#E8E4DC", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -308,9 +352,14 @@ export default function PathMapperApp() {
 
         {isLoading && (
           <div style={{ display: "flex", gap: 10, alignSelf: "flex-start", maxWidth: "92%" }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0, marginTop: 18, background: "#1a2e22", border: "2px solid #5B8A6A" }}>🌿</div>
+            <div style={{
+              width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16, flexShrink: 0, marginTop: 18, background: typingConfig.bg, border: `2px solid ${typingConfig.color}`
+            }}>{typingConfig.emoji}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#5B8A6A", marginLeft: 2 }}>The Listener</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: typingConfig.color, marginLeft: 2 }}>
+                {typingPersona}
+              </div>
               <TypingDots />
             </div>
           </div>
