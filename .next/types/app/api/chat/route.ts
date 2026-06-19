@@ -1,4 +1,4 @@
-// File: C:\Users\hp\Downloads\pathmapper-v2 (2)\pathmapper\app\api\chat\route.ts
+// File: C:\Users\nancy\Desktop\USAII_hacathon\Friends_Group_AI\app\api\chat\route.ts
 import * as entry from '../../../../../app/api/chat/route.js'
 import type { NextRequest } from 'next/server.js'
 

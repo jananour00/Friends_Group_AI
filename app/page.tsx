@@ -1,4 +1,5 @@
 "use client";
+import { UserButton, SignInButton, Show } from "@clerk/nextjs";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { ChatMessage, DimensionScores, NarrativeOutput, ScoringOutput, StanceOutput, PipelinePhase, PipelineState } from "@/types/pipeline";
@@ -333,17 +334,39 @@ export default function PathMapperApp() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", maxWidth: 800, margin: "0 auto", background: "#0F0F16", color: "#E8E4DC", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
-      {/* Header */}
+      {/* Authenticated Application Header Row */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #1E1E2E", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px" }}>
-          <span>🗺️</span> PathMapper
-          <span style={{ fontSize: 11, background: "#1E2A3A", color: "#6A9FD8", padding: "2px 8px", borderRadius: 20, fontWeight: 600, letterSpacing: "0.5px" }}>BETA</span>
+        {/* Left Side: App Title and Subtitle */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px" }}>
+            <span>🗺️</span> PathMapper Group Chat
+            <span style={{ fontSize: 11, background: "#1E2A3A", color: "#6A9FD8", padding: "2px 8px", borderRadius: 20, fontWeight: 600, letterSpacing: "0.5px" }}>BETA</span>
+          </div>
+          <span style={{ color: "#8A8A9A", fontSize: 12 }}>Active friends: Sam, Dev, Mina, Theo, Priya, Jordan</span>
         </div>
-        {started && (
-          <button onClick={reset} style={{ background: "none", border: "1px solid #2A2A3E", color: "#888", padding: "5px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
-            New decision
-          </button>
-        )}
+  
+        {/* Right Side: Navigation Actions & Auth Layout */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {started && (
+            <button onClick={reset} style={{ background: "none", border: "1px solid #2A2A3E", color: "#888", padding: "5px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+              New decision
+            </button>
+          )}
+    
+          {/* Display when the user is completely signed out */}
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button style={{ background: "#5B8A6A", color: "white", border: "none", padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}>
+                Sign In
+              </button>
+            </SignInButton>
+          </Show>
+
+          {/* Display when a valid session token is found */}
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
+        </div>
       </header>
 
       {/* Messages */}

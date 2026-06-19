@@ -1,4 +1,4 @@
-// File: C:\Users\hp\Downloads\pathmapper-v2 (2)\pathmapper\app\page.tsx
+// File: C:\Users\nancy\Desktop\USAII_hacathon\Friends_Group_AI\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

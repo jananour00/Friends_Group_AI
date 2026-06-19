@@ -10,6 +10,7 @@ PathMapper is an AI-powered life decision simulator that helps users unpack comp
 ### 1. Get Free API Keys
 * Gemini API Key: Get a free key at https://aistudio.google.com/app/apikey
 * Groq API Key (Optional): Get a key at https://console.groq.com/keys (The application automatically falls back to Gemini if your Groq key is rate-limited or missing).
+* Clerk Authentication: Sign up for a free developer account at Clerk and create an application instance.
 
 ### 2. Install & Run
 
@@ -20,6 +21,13 @@ npm install
 # Setup environment variables
 cp .env.local.template .env
 # Open .env and paste your GEMINI_API_KEY and GROQ_API_KEY
+
+# Install the Clerk CLI globally and authenticate
+npm install -g clerk
+clerk auth login
+
+# Link your local workspace to your Clerk Application instance
+clerk init --app app_3FNINQmj0FiVfcqp47BOqVpa4eb
 
 # Run development server
 npm run dev
@@ -34,6 +42,9 @@ npx vercel
 # Add the environment variables in your Vercel project settings:
 # - GEMINI_API_KEY
 # - GROQ_API_KEY
+# - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+# - CLERK_SECRET_KEY
+# - NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL
 ```
 
 ---
@@ -129,6 +140,11 @@ Copy `.env.local.template` to `.env` and fill in the values:
 # API Keys (Required)
 GEMINI_API_KEY=AIzaSy...           # Get free at https://aistudio.google.com
 GROQ_API_KEY=gsk_...               # Get free at https://console.groq.com
+
+# Clerk v5 Authentication Credentials
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_YourClerkPublishableKeyHere
+CLERK_SECRET_KEY=sk_test_YourClerkSecretKeyHere
+NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL=/
 
 # App configuration
 NEXT_PUBLIC_BASE_URL=http://localhost:3000

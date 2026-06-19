@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import type { PipelineState, CheckpointType, ResolutionTag } from "@/types/pipeline";
 import { callLLMJSON, callLLM } from "@/lib/pipeline/llm-client";
 import {
@@ -323,6 +324,10 @@ Deliver the lean, flip condition (copied or closely paraphrased from recommended
 // ─── MAIN PIPELINE ORCHESTRATOR ───────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { state, user_message }: { state: PipelineState; user_message?: string } =
       await req.json();
 

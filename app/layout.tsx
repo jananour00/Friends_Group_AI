@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
   title: "PathMapper — Decisions, Thought Through",
@@ -7,10 +8,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body style={{ margin: 0, padding: 0, height: "100dvh", overflow: "hidden", background: "#0A0A0F" }}>
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body style={{ margin: 0, padding: 0, height: "100dvh", overflow: "hidden", background: "#0A0A0F" }}>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
