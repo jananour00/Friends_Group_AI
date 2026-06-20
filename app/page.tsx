@@ -21,12 +21,12 @@ const INITIAL: PipelineState = {
 };
 
 const PERSONAS = {
-  Sam: { defaultName: "Cora", color: "#00FF88", bg: "#0A1F1F", emoji: "💬", subtitle: "the Coordinator", accent: "#00FF88" },
-  Dev: { defaultName: "Felix", color: "#FF006E", bg: "#1F0A15", emoji: "🎯", subtitle: "the Fact Checker", accent: "#FF006E" },
-  Mina: { defaultName: "Paige", color: "#FFD700", bg: "#1F1A08", emoji: "🌸", subtitle: "the Pattern Detector", accent: "#FFD700" },
-  Theo: { defaultName: "Carter", color: "#00D9FF", bg: "#0A1F2E", emoji: "📋", subtitle: "the Categorizer", accent: "#00D9FF" },
-  Priya: { defaultName: "Connie", color: "#B537F2", bg: "#15080F", emoji: "🌙", subtitle: "the Confidence Meter", accent: "#B537F2" },
-  Jordan: { defaultName: "Blair", color: "#FF9500", bg: "#1F1208", emoji: "⚡", subtitle: "the Blindspot Finder", accent: "#FF9500" },
+  Sam: { defaultName: "Cora", color: "#8B5CF6", bg: "#1E1142", emoji: "💬", subtitle: "the Coordinator", accent: "#A78BFA" },
+  Dev: { defaultName: "Felix", color: "#3B82F6", bg: "#0F2B4E", emoji: "🎯", subtitle: "the Fact Checker", accent: "#60A5FA" },
+  Mina: { defaultName: "Paige", color: "#06B6D4", bg: "#0D2C3C", emoji: "🌸", subtitle: "the Pattern Detector", accent: "#22D3EE" },
+  Theo: { defaultName: "Carter", color: "#8B5CF6", bg: "#1E1142", emoji: "📋", subtitle: "the Categorizer", accent: "#A78BFA" },
+  Priya: { defaultName: "Connie", color: "#6D28D9", bg: "#160F32", emoji: "🌙", subtitle: "the Confidence Meter", accent: "#7C3AED" },
+  Jordan: { defaultName: "Blair", color: "#0EA5E9", bg: "#0C2A47", emoji: "⚡", subtitle: "the Blindspot Finder", accent: "#38BDF8" },
 } as const;
 
 const dimLabels: Record<string, string> = {
@@ -100,12 +100,12 @@ function ScoreBar({ label, a, b }: { label: string; a: number; b: number }) {
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: "10px 0" }}>
       <div style={{ fontSize: 12, color: "#B0B9C3", width: 100, flexShrink: 0, fontWeight: 500 }}>{label}</div>
       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ flex: 1, height: 8, background: "#1F2937", borderRadius: 4, overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.5)" }}>
-          <div style={{ height: "100%", width: `${(a / 5) * 100}%`, background: "linear-gradient(90deg, #25D366, #1da851)", borderRadius: 4, transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)", boxShadow: "0 0 8px rgba(37, 211, 102, 0.4)" }} />
+        <div style={{ flex: 1, height: 8, background: "#1E293B", borderRadius: 4, overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.5)" }}>
+          <div style={{ height: "100%", width: `${(a / 5) * 100}%`, background: "linear-gradient(90deg, #8B5CF6, #7C3AED)", borderRadius: 4, transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)", boxShadow: "0 0 8px rgba(139, 92, 246, 0.4)" }} />
         </div>
-        <div style={{ fontSize: 11, color: "#25D366", width: 32, textAlign: "center", flexShrink: 0, fontWeight: 600 }}>{a}:{b}</div>
-        <div style={{ flex: 1, height: 8, background: "#1F2937", borderRadius: 4, overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.5)" }}>
-          <div style={{ height: "100%", width: `${(b / 5) * 100}%`, background: "linear-gradient(90deg, #FF6B6B, #E63946)", borderRadius: 4, transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)", boxShadow: "0 0 8px rgba(255, 107, 107, 0.4)" }} />
+        <div style={{ fontSize: 11, color: "#A78BFA", width: 32, textAlign: "center", flexShrink: 0, fontWeight: 600 }}>{a}:{b}</div>
+        <div style={{ flex: 1, height: 8, background: "#1E293B", borderRadius: 4, overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.5)" }}>
+          <div style={{ height: "100%", width: `${(b / 5) * 100}%`, background: "linear-gradient(90deg, #3B82F6, #0EA5E9)", borderRadius: 4, transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)", boxShadow: "0 0 8px rgba(59, 130, 246, 0.4)" }} />
         </div>
       </div>
     </div>
@@ -243,11 +243,11 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
           padding: "12px 16px",
           borderRadius: isUser ? "18px 4px 18px 18px" : "18px 18px 4px 18px",
           fontSize: 14, lineHeight: 1.6,
-          background: isUser ? "#00FF88" : (persona?.bg ?? "#0A0E27"),
-          color: isUser ? "#0A0E27" : "#E5E7EB",
-          border: `2px solid ${isUser ? "#00FF88" : (persona?.color ?? "#1F3A3A")}`,
+          background: isUser ? "#3B82F6" : (persona?.bg ?? "#0D1B2A"),
+          color: isUser ? "#ffffff" : "#E5E7EB",
+          border: `2px solid ${isUser ? "#3B82F6" : (persona?.color ?? "#1F3A3A")}`,
           maxWidth: msg.type === "narratives" ? 560 : undefined,
-          boxShadow: `0 0 20px ${isUser ? "#00FF8844" : (persona?.color + "44" ?? "#00000040")}`,
+          boxShadow: `0 0 20px ${isUser ? "#3B82F644" : (persona?.color + "44" ?? "#00000040")}`,
           cursor: "pointer", transition: "all 0.3s ease", position: "relative",
           onMouseEnter: (e: any) => {
             e.currentTarget.style.boxShadow = `0 0 32px ${isUser ? "#00FF88" : (persona?.color ?? "#0A0E27")}`;
@@ -259,11 +259,11 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
           }
         } as any}
           onMouseEnter={(e: any) => {
-            e.currentTarget.style.boxShadow = `0 0 32px ${isUser ? "#00FF88" : (persona?.color ?? "#0A0E27")}`;
+            e.currentTarget.style.boxShadow = `0 0 32px ${isUser ? "#3B82F6" : (persona?.color ?? "#0D1B2A")}`;
             setHoveredBubble(true);
           }}
           onMouseLeave={(e: any) => {
-            e.currentTarget.style.boxShadow = `0 0 20px ${isUser ? "#00FF8844" : (persona?.color + "44" ?? "#00000040")}`;
+            e.currentTarget.style.boxShadow = `0 0 20px ${isUser ? "#3B82F644" : (persona?.color + "44" ?? "#00000040")}`;
             setHoveredBubble(false);
           }}
         >
@@ -283,7 +283,7 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
           {isUser && <span title="Message delivered">✓✓</span>}
           {hoveredBubble && (
             <button onClick={handleCopy} style={{
-              background: "none", border: "none", color: persona?.color ?? "#00FF88", cursor: "pointer", fontSize: 12, padding: 0,
+              background: "none", border: "none", color: persona?.color ?? "#8B5CF6", cursor: "pointer", fontSize: 12, padding: 0,
               transition: "all 0.3s ease", fontWeight: 600
             }}
               onMouseEnter={e => {
@@ -310,10 +310,10 @@ function GroupInfoPanel({ customNames }: { customNames: Record<string, string> }
 
   return (
     <div style={{
-      width: 280, background: "#0A0E27", borderLeft: "2px solid #00FF8844", display: "flex", flexDirection: "column",
-      padding: "20px 16px", gap: 16, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.6)"
+      width: 280, background: "#0D1B2A", borderLeft: "2px solid #8B5CF644", display: "flex", flexDirection: "column",
+      padding: "20px 16px", gap: 16, overflowY: "auto", boxShadow: "-4px 0 20px rgba(139, 92, 246, 0.1)"
     }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: "#00FF88", letterSpacing: "1px", textTransform: "uppercase" }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: "#A78BFA", letterSpacing: "1px", textTransform: "uppercase" }}>
         Group Members
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -387,26 +387,26 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 20px", textAlign: "center", gap: 16 }}>
-      <h1 style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, margin: 0, color: "#25D366", animation: "bounce 2s infinite" }}>🗺️ PathMapper</h1>
+      <h1 style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, margin: 0, color: "#A78BFA", animation: "bounce 2s infinite" }}>🗺️ PathMapper</h1>
       <p style={{ color: "#9CA3AF", fontSize: 16, maxWidth: 380, lineHeight: 1.6, margin: 0 }}>Your decisions, thought through — not decided for you. Meet your AI friends who debate every angle.</p>
       <div style={{ marginTop: 24, width: "100%", maxWidth: 580, display: "flex", flexDirection: "column", gap: 10 }}>
         <p style={{ fontSize: 12, color: "#6B7280", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 8px", fontWeight: 600 }}>Choose a scenario:</p>
         {examples.map((ex, i) => (
           <button key={i} onClick={() => onSend(ex.value)} style={{
-            background: "#1F2937", border: "1.5px solid #374151", color: "#D1D5DB",
+            background: "#1E293B", border: "1.5px solid #334155", color: "#D1D5DB",
             padding: "16px 20px", borderRadius: 12, textAlign: "left", fontSize: 13, lineHeight: 1.6,
             cursor: "pointer", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)", fontFamily: "inherit", fontWeight: 500,
             boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
           }}
             onMouseEnter={e => { 
-              (e.target as HTMLElement).style.borderColor = "#25D366"; 
-              (e.target as HTMLElement).style.backgroundColor = "#0D2818";
-              (e.target as HTMLElement).style.color = "#25D366";
-              (e.target as HTMLElement).style.boxShadow = "0 0 16px rgba(37, 211, 102, 0.2)";
+              (e.target as HTMLElement).style.borderColor = "#A78BFA"; 
+              (e.target as HTMLElement).style.backgroundColor = "#1E1142";
+              (e.target as HTMLElement).style.color = "#A78BFA";
+              (e.target as HTMLElement).style.boxShadow = "0 0 16px rgba(167, 139, 250, 0.2)";
             }}
             onMouseLeave={e => { 
-              (e.target as HTMLElement).style.borderColor = "#374151"; 
-              (e.target as HTMLElement).style.backgroundColor = "#1F2937";
+              (e.target as HTMLElement).style.borderColor = "#334155"; 
+              (e.target as HTMLElement).style.backgroundColor = "#1E293B";
               (e.target as HTMLElement).style.color = "#D1D5DB";
               (e.target as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.2)";
             }}
@@ -875,7 +875,7 @@ export default function PathMapperApp() {
   const typingConfig = typingPersona ? (PERSONAS[typingPersona as keyof typeof PERSONAS] || PERSONAS.Sam) : PERSONAS.Sam;
 
   return (
-    <div style={{ display: "flex", height: "100dvh", width: "100vw", background: "#0A0E27", color: "#E5E7EB", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100dvh", width: "100vw", background: "#0D1B2A", color: "#E5E7EB", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflow: "hidden" }}>
       <style>{`
         @media (max-width: 768px) {
           .desktop-sidebar {
@@ -922,14 +922,14 @@ export default function PathMapperApp() {
         style={{ 
           display: "flex", 
           flexDirection: "column", 
-          width: isSidebarOpen ? 260 : 0, 
-          borderRight: isSidebarOpen ? "1px solid #1E1E2E" : "0px solid transparent", 
-          background: "#0A0A10", 
+          width: isSidebarOpen ? 280 : 0, 
+          borderRight: isSidebarOpen ? "1px solid #1E3A4C" : "0px solid transparent", 
+          background: "#0F2140", 
           flexShrink: 0, 
-          padding: isSidebarOpen ? "16px 12px" : "16px 0", 
+          padding: isSidebarOpen ? "20px 14px" : "16px 0", 
           gap: 16,
           overflow: "hidden",
-          transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
+          transition: "width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), padding 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
         }}
       >
         <div style={{ width: 236, display: "flex", flexDirection: "column", gap: 16, height: "100%", flexShrink: 0 }}>
@@ -937,7 +937,18 @@ export default function PathMapperApp() {
             <span>🗺️</span> PathMapper
           </div>
           
-          <button onClick={reset} style={{ width: "100%", padding: "10px", borderRadius: 8, background: "#1C1C2C", color: "#E8E4DC", border: "1px solid #2A2A3E", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background 0.2s" }}>
+          <button onClick={reset} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, background: "#8B5CF6", color: "#ffffff", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.3s ease", boxShadow: "0 2px 8px rgba(139, 92, 246, 0.2)" }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = "#7C3AED";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(139, 92, 246, 0.3)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "#8B5CF6";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(139, 92, 246, 0.2)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
             <span>➕</span> New Decision
           </button>
 
@@ -1184,10 +1195,10 @@ export default function PathMapperApp() {
 
       {/* MAIN CHAT AREA */}
       <div style={{ display: "flex", flex: 1, height: "100%" }}>
-        <div className="main-chat-container" style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", background: "#0A0E27", borderLeft: "1px solid #1F3A3A", borderRight: "1px solid #1F3A3A", position: "relative" }}>
+        <div className="main-chat-container" style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", background: "#0D1B2A", borderLeft: "1px solid #1E3A4C", borderRight: "1px solid #1E3A4C", position: "relative" }}>
         
         {/* Authenticated Application Header Row */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "2px solid #1F3A3A", flexShrink: 0, backgroundColor: "#0A0E27", boxShadow: "0 0 20px rgba(0, 255, 136, 0.1)" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "2px solid #1E3A4C", flexShrink: 0, backgroundColor: "#0D1B2A", boxShadow: "0 0 20px rgba(139, 92, 246, 0.1)" }}>
           {/* Left Side: App Title and Subtitle */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {/* Desktop Toggle Sidebar Button */}
@@ -1226,7 +1237,7 @@ export default function PathMapperApp() {
                   ☰
                 </button>
                 <span>🗺️</span> PathMapper
-                <span style={{ fontSize: 11, background: "rgba(37, 211, 102, 0.15)", color: "#25D366", padding: "4px 10px", borderRadius: 12, fontWeight: 700, letterSpacing: "0.8px", border: "1px solid rgba(37, 211, 102, 0.3)" }}>BETA</span>
+                <span style={{ fontSize: 11, background: "rgba(139, 92, 246, 0.15)", color: "#A78BFA", padding: "4px 10px", borderRadius: 12, fontWeight: 700, letterSpacing: "0.8px", border: "1px solid rgba(139, 92, 246, 0.3)" }}>BETA</span>
               </div>
               <span style={{ color: "#9CA3AF", fontSize: 12, fontWeight: 500 }}>
                 Friends: {getFriendName("Sam")}, {getFriendName("Dev")}, {getFriendName("Mina")}, +3 more
@@ -1241,29 +1252,29 @@ export default function PathMapperApp() {
                 setSettingsTab("names");
                 setShowEditModal(true);
               }}
-              style={{ background: "#1F2937", border: "1px solid #374151", color: "#D1D5DB", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease" }}
+              style={{ background: "#1E293B", border: "1px solid #334155", color: "#D1D5DB", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease" }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = "#374151";
+                e.currentTarget.style.background = "#334155";
                 e.currentTarget.style.color = "#F3F4F6";
-                e.currentTarget.style.borderColor = "#4B5563";
+                e.currentTarget.style.borderColor = "#475569";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "#1F2937";
+                e.currentTarget.style.background = "#1E293B";
                 e.currentTarget.style.color = "#D1D5DB";
-                e.currentTarget.style.borderColor = "#374151";
+                e.currentTarget.style.borderColor = "#334155";
               }}
             >
               ⚙️ Settings
             </button>
 
             {started && (
-              <button onClick={reset} style={{ background: "#1F2937", border: "1px solid #374151", color: "#9CA3AF", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease" }}
+              <button onClick={reset} style={{ background: "#1E293B", border: "1px solid #334155", color: "#9CA3AF", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease" }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = "#374151";
+                  e.currentTarget.style.background = "#334155";
                   e.currentTarget.style.color = "#E5E7EB";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = "#1F2937";
+                  e.currentTarget.style.background = "#1E293B";
                   e.currentTarget.style.color = "#9CA3AF";
                 }}
               >
@@ -1274,14 +1285,14 @@ export default function PathMapperApp() {
             {/* Display when the user is completely signed out */}
             <SignedOut>
               <SignInButton mode="modal">
-                <button style={{ background: "#25D366", color: "#ffffff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.3s ease", boxShadow: "0 2px 8px rgba(37, 211, 102, 0.3)" }}
+                <button style={{ background: "#8B5CF6", color: "#ffffff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.3s ease", boxShadow: "0 2px 8px rgba(139, 92, 246, 0.3)" }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = "#1da851";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(37, 211, 102, 0.4)";
+                    e.currentTarget.style.background = "#7C3AED";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(139, 92, 246, 0.4)";
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = "#25D366";
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(37, 211, 102, 0.3)";
+                    e.currentTarget.style.background = "#8B5CF6";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(139, 92, 246, 0.3)";
                   }}
                 >
                   Sign In
@@ -1357,7 +1368,7 @@ export default function PathMapperApp() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: "16px 20px", borderTop: "1px solid #1F3A3A", flexShrink: 0, background: "#0A0E27" }}>
+        <div style={{ padding: "16px 20px", borderTop: "1px solid #1E3A4C", flexShrink: 0, background: "#0D1B2A" }}>
           {/* Export/Share Controls */}
           {started && messages.length > 0 && (
             <div style={{ display: "flex", gap: 10, marginBottom: 12, justifyContent: "flex-end" }}>
@@ -1368,15 +1379,15 @@ export default function PathMapperApp() {
                   alert('Chat copied to clipboard!');
                 }}
                 style={{
-                  background: "#1F3A3A", border: "1px solid #00FF8844", color: "#00FF88", padding: "6px 12px",
+                  background: "#1E293B", border: "1px solid #8B5CF644", color: "#A78BFA", padding: "6px 12px",
                   borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease"
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = "#00FF8844";
-                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0, 255, 136, 0.3)";
+                  e.currentTarget.style.background = "#8B5CF644";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(139, 92, 246, 0.3)";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = "#1F3A3A";
+                  e.currentTarget.style.background = "#1E293B";
                   e.currentTarget.style.boxShadow = "none";
                 }}
                 title="Copy entire chat to clipboard"
@@ -1394,15 +1405,15 @@ export default function PathMapperApp() {
                   a.click();
                 }}
                 style={{
-                  background: "#1F3A3A", border: "1px solid #FFD70044", color: "#FFD700", padding: "6px 12px",
+                  background: "#1E293B", border: "1px solid #3B82F644", color: "#60A5FA", padding: "6px 12px",
                   borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease"
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = "#FFD70044";
-                  e.currentTarget.style.boxShadow = "0 0 12px rgba(255, 215, 0, 0.3)";
+                  e.currentTarget.style.background = "#3B82F644";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(59, 130, 246, 0.3)";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = "#1F3A3A";
+                  e.currentTarget.style.background = "#1E293B";
                   e.currentTarget.style.boxShadow = "none";
                 }}
                 title="Download chat as text file"
@@ -1413,7 +1424,7 @@ export default function PathMapperApp() {
           )}
         </div>
 
-        <div style={{ padding: "12px 16px", borderTop: "1px solid #1F3A3A", flexShrink: 0, background: "#0A0E27" }}>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #1E3A4C", flexShrink: 0, background: "#0D1B2A" }}>
           {isDone ? (
             <div style={{ textAlign: "center", fontSize: 12, color: "#555" }}>
               Analysis complete. {" "}
@@ -1446,22 +1457,22 @@ export default function PathMapperApp() {
                 disabled={isLoading || !input.trim()}
                 style={{
                   width: 40, height: 40, borderRadius: "50%",
-                  background: isLoading || !input.trim() ? "#1F3A3A" : "#00FF88",
-                  border: `2px solid ${isLoading || !input.trim() ? "#1F3A3A" : "#00FF88"}`,
+                  background: isLoading || !input.trim() ? "#1E293B" : "#3B82F6",
+                  border: `2px solid ${isLoading || !input.trim() ? "#1E293B" : "#3B82F6"}`,
                   cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, color: isLoading || !input.trim() ? "#6B7280" : "#0A0E27", fontSize: 18, fontWeight: 700,
-                  transition: "all 0.3s ease", boxShadow: isLoading || !input.trim() ? "none" : "0 0 16px rgba(0, 255, 136, 0.5)"
+                  flexShrink: 0, color: isLoading || !input.trim() ? "#6B7280" : "#ffffff", fontSize: 18, fontWeight: 700,
+                  transition: "all 0.3s ease", boxShadow: isLoading || !input.trim() ? "none" : "0 0 16px rgba(59, 130, 246, 0.5)"
                 }}
                 onMouseEnter={e => {
                   if (!isLoading && input.trim()) {
-                    e.currentTarget.style.boxShadow = "0 0 24px rgba(0, 255, 136, 0.8)";
+                    e.currentTarget.style.boxShadow = "0 0 24px rgba(59, 130, 246, 0.8)";
                     e.currentTarget.style.transform = "scale(1.1)";
                   }
                 }}
                 onMouseLeave={e => {
                   if (!isLoading && input.trim()) {
-                    e.currentTarget.style.boxShadow = "0 0 16px rgba(0, 255, 136, 0.5)";
+                    e.currentTarget.style.boxShadow = "0 0 16px rgba(59, 130, 246, 0.5)";
                     e.currentTarget.style.transform = "scale(1)";
                   }
                 }}
