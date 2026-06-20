@@ -354,18 +354,18 @@ export default function PathMapperApp() {
           )}
 
           {/* Display when the user is completely signed out */}
-          <Show when="signed-out">
+          <SignedOut>
             <SignInButton mode="modal">
               <button style={{ background: "#5B8A6A", color: "white", border: "none", padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}>
                 Sign In
               </button>
             </SignInButton>
-          </Show>
+          </SignedOut>
 
           {/* Display when a valid session token is found */}
-          <Show when="signed-in">
+          <SignedIn>
             <UserButton />
-          </Show>
+          </SignedIn>
         </div>
       </header>
 
