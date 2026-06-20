@@ -299,11 +299,18 @@ export default function PathMapperApp() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [customNames, setCustomNames] = useState<Record<string, string>>({});
   const [showEditModal, setShowEditModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"names" | "security">("names");
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [showRateLimitCard, setShowRateLimitCard] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [lockPin, setLockPin] = useState("");
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
+  const [setupPinInput, setSetupPinInput] = useState("");
+  const [setupPinError, setSetupPinError] = useState(false);
   
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
@@ -324,7 +331,9 @@ export default function PathMapperApp() {
 
   // 1. Mount Effect: Load data from localStorage safely
   useEffect(() => {
+    if (!isClerkLoaded) return;
     setHasMounted(true);
+    setIsStorageLoaded(false);
     const load = async () => {
       try {
         const storedNames = localStorage.getItem("pathmapper_custom_names");
@@ -338,6 +347,12 @@ export default function PathMapperApp() {
             parsed = JSON.parse(decrypted);
           }
           if (parsed) setCustomNames(parsed);
+        }
+
+        const storedPin = localStorage.getItem("pathmapper_lock_pin");
+        if (storedPin) {
+          const decrypted = await decryptAES(encryptionKey, storedPin);
+          if (decrypted) setLockPin(decrypted);
         }
         
         const storedSessions = localStorage.getItem("pathmapper_sessions");
@@ -369,16 +384,19 @@ export default function PathMapperApp() {
             }
           }
         }
+        setIsStorageLoaded(true);
       } catch (e) {
         console.error("Failed to load local storage:", e);
+        setIsStorageLoaded(true);
       }
     };
     load();
-  }, [encryptionKey]);
+  }, [encryptionKey, isClerkLoaded]);
 
   // 1.5. Auto-save Sessions and Custom Names when they change (Async Encryption)
+  // 1.5. Auto-save Sessions and Custom Names when they change (Async Encryption)
   useEffect(() => {
-    if (!hasMounted) return;
+    if (!isClerkLoaded || !isStorageLoaded) return;
     const save = async () => {
       try {
         const encrypted = await encryptAES(encryptionKey, JSON.stringify(sessions));
@@ -388,10 +406,10 @@ export default function PathMapperApp() {
       }
     };
     save();
-  }, [sessions, encryptionKey, hasMounted]);
+  }, [sessions, encryptionKey, isStorageLoaded, isClerkLoaded]);
 
   useEffect(() => {
-    if (!hasMounted) return;
+    if (!isClerkLoaded || !isStorageLoaded) return;
     const save = async () => {
       try {
         const encrypted = await encryptAES(encryptionKey, JSON.stringify(customNames));
@@ -401,11 +419,27 @@ export default function PathMapperApp() {
       }
     };
     save();
-  }, [customNames, encryptionKey, hasMounted]);
+  }, [customNames, encryptionKey, isStorageLoaded, isClerkLoaded]);
+
+  useEffect(() => {
+    if (!isClerkLoaded || !isStorageLoaded) return;
+    const save = async () => {
+      try {
+        // If the PIN is empty, don't write an empty pin to local storage if we want to prompt for first-time use.
+        // Wait, actually writing empty pin is okay, or we can only write it if it's set.
+        // If they clear it in settings we might want to save it as empty to prompt again.
+        const encrypted = await encryptAES(encryptionKey, lockPin);
+        localStorage.setItem("pathmapper_lock_pin", encrypted);
+      } catch (e) {
+        console.error("Failed to save lock PIN:", e);
+      }
+    };
+    save();
+  }, [lockPin, encryptionKey, isStorageLoaded, isClerkLoaded]);
 
   // 2. Sync Effect: Auto-save messages and pipeline state for current session
   useEffect(() => {
-    if (!hasMounted || !currentSessionId || isSwitchingRef.current || messages.length === 0) return;
+    if (!isClerkLoaded || !isStorageLoaded || !currentSessionId || isSwitchingRef.current || messages.length === 0) return;
     
     setSessions(prev => {
       const sessionIndex = prev.findIndex(s => s.id === currentSessionId);
@@ -439,7 +473,7 @@ export default function PathMapperApp() {
       next.sort((a, b) => b.updatedAt - a.updatedAt);
       return next;
     });
-  }, [messages, pipeline, currentSessionId, hasMounted]);
+  }, [messages, pipeline, currentSessionId, isStorageLoaded, isClerkLoaded]);
 
   // 3. Wiping localStorage on Logout
   const prevUserRef = useRef<any>(null);
@@ -492,6 +526,13 @@ export default function PathMapperApp() {
       timeoutRefs.current.forEach(clearTimeout);
     };
   }, []);
+
+  useEffect(() => {
+    if (isLocked) {
+      setPinInput("");
+      setPinError(false);
+    }
+  }, [isLocked]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -667,6 +708,17 @@ export default function PathMapperApp() {
     setTypingPersona(null);
     setCurrentSessionId(null);
     localStorage.removeItem("pathmapper_current_session_id");
+  };
+
+  const handleUnlock = () => {
+    if (pinInput === lockPin) {
+      setIsLocked(false);
+      setPinInput("");
+      setPinError(false);
+      lastActivityRef.current = Date.now();
+    } else {
+      setPinError(true);
+    }
   };
 
   const isDone = pipeline.phase === "done";
@@ -1038,10 +1090,13 @@ export default function PathMapperApp() {
           {/* Right Side: Navigation Actions & Auth Layout */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
-              onClick={() => setShowEditModal(true)}
+              onClick={() => {
+                setSettingsTab("names");
+                setShowEditModal(true);
+              }}
               style={{ background: "none", border: "1px solid #2A2A3E", color: "#B8B8C8", padding: "6px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 500 }}
             >
-              ✏️ Edit Friends
+              ⚙️ Settings
             </button>
 
             {started && (
@@ -1176,65 +1231,225 @@ export default function PathMapperApp() {
         </div>
       </div>
 
-      {/* CUSTOM NAMES EDITOR MODAL */}
+      {/* SETTINGS & CUSTOMIZATION MODAL */}
       {showEditModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
           <div style={{ background: "#161622", border: "1px solid #2A2A4E", borderRadius: 16, width: "100%", maxWidth: 450, padding: 24, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Customize Friend Names</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Settings & Customization</h3>
               <button onClick={() => setShowEditModal(false)} style={{ background: "none", border: "none", color: "#888", fontSize: 16, cursor: "pointer" }}>✕</button>
             </div>
-            <p style={{ margin: 0, fontSize: 12, color: "#8A8A9A" }}>Change the names of your AI friend group. These will show up in the chat conversation.</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxHeight: 300, overflowY: "auto" }}>
-              {Object.entries(PERSONAS).map(([key, config]) => (
-                <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: config.color, display: "flex", alignItems: "center", gap: 4 }}>
-                    <span>{config.emoji}</span> {config.defaultName} <span style={{ color: "#555", fontSize: 10 }}>— {config.subtitle}</span>
-                  </label>
+
+            {/* Tabs */}
+            <div style={{ display: "flex", borderBottom: "1px solid #2A2A3E", gap: 16, paddingBottom: 8 }}>
+              <button
+                onClick={() => setSettingsTab("names")}
+                style={{
+                  background: "none", border: "none", color: settingsTab === "names" ? "#E8E4DC" : "#8A8A9A",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer", padding: "4px 8px",
+                  borderBottom: settingsTab === "names" ? "2px solid #5B8A6A" : "2px solid transparent",
+                  transition: "all 0.15s"
+                }}
+              >
+                AI Friends
+              </button>
+              <button
+                onClick={() => setSettingsTab("security")}
+                style={{
+                  background: "none", border: "none", color: settingsTab === "security" ? "#E8E4DC" : "#8A8A9A",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer", padding: "4px 8px",
+                  borderBottom: settingsTab === "security" ? "2px solid #5B8A6A" : "2px solid transparent",
+                  transition: "all 0.15s"
+                }}
+              >
+                Security PIN
+              </button>
+            </div>
+
+            {settingsTab === "names" ? (
+              <>
+                <p style={{ margin: 0, fontSize: 12, color: "#8A8A9A" }}>Change the names of your AI friend group. These will show up in the chat conversation.</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxHeight: 260, overflowY: "auto" }} className="sidebar-scroll">
+                  {Object.entries(PERSONAS).map(([key, config]) => (
+                    <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: config.color, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span>{config.emoji}</span> {config.defaultName} <span style={{ color: "#555", fontSize: 10 }}>— {config.subtitle}</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={`e.g. ${config.defaultName}`}
+                        value={customNames[key] || ""}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCustomNames(prev => ({ ...prev, [key]: val }));
+                        }}
+                        style={{ background: "#0F0F16", border: "1px solid #2A2A3E", borderRadius: 8, padding: "8px 10px", color: "#E8E4DC", fontSize: 13, outline: "none" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                {showResetNamesConfirm ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "#2A1515", border: "1px solid #C45A5A44", borderRadius: 12, padding: 12, marginTop: 8, animation: "fadeIn 0.2s ease" }}>
+                    <div style={{ fontSize: 12, color: "#F0A0A0", fontWeight: 600 }}>Reset all friend names to default? This cannot be undone.</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          setCustomNames({});
+                          setShowResetNamesConfirm(false);
+                        }}
+                        style={{ flex: 1, background: "#C45A5A", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                      >
+                        Yes, Reset
+                      </button>
+                      <button
+                        onClick={() => setShowResetNamesConfirm(false)}
+                        style={{ flex: 1, background: "#222", border: "1px solid #444", color: "#ccc", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 8 }}>
+                    <button onClick={() => setShowResetNamesConfirm(true)} style={{ background: "none", border: "1px solid #C45A5A33", color: "#C45A5A", padding: "8px 14px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
+                      Reset All
+                    </button>
+                    <button onClick={() => setShowEditModal(false)} style={{ background: "#5B8A6A", border: "none", color: "white", padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      Done
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <p style={{ margin: 0, fontSize: 12, color: "#8A8A9A", lineHeight: 1.5 }}>
+                  Set a custom security PIN to lock/unlock your active session during inactivity.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "#8A8A9A" }}>Unlock PIN</label>
                   <input
                     type="text"
-                    placeholder={`e.g. ${config.defaultName}`}
-                    value={customNames[key] || ""}
+                    maxLength={10}
+                    placeholder="Enter security PIN (e.g. 1234)"
+                    value={lockPin}
                     onChange={e => {
-                      const val = e.target.value;
-                      setCustomNames(prev => ({ ...prev, [key]: val }));
+                      const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                      setLockPin(val);
                     }}
-                    style={{ background: "#0F0F16", border: "1px solid #2A2A3E", borderRadius: 8, padding: "8px 10px", color: "#E8E4DC", fontSize: 13, outline: "none" }}
+                    style={{ background: "#0F0F16", border: "1px solid #2A2A3E", borderRadius: 8, padding: "10px 12px", color: "#E8E4DC", fontSize: 14, outline: "none", letterSpacing: "1px" }}
                   />
                 </div>
-              ))}
-            </div>
-            {showResetNamesConfirm ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "#2A1515", border: "1px solid #C45A5A44", borderRadius: 12, padding: 12, marginTop: 8, animation: "fadeIn 0.2s ease" }}>
-                <div style={{ fontSize: 12, color: "#F0A0A0", fontWeight: 600 }}>Reset all friend names to default? This cannot be undone.</div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                   <button
                     onClick={() => {
-                      setCustomNames({});
-                      setShowResetNamesConfirm(false);
+                      if (lockPin.length < 4) {
+                        alert("PIN must be at least 4 characters long.");
+                      } else if (lockPin === "1234") {
+                        alert("For security, '1234' is not allowed as a PIN. Please set a custom PIN.");
+                      } else {
+                        setShowEditModal(false);
+                      }
                     }}
-                    style={{ flex: 1, background: "#C45A5A", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                    style={{ background: "#5B8A6A", border: "none", color: "white", padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
                   >
-                    Yes, Reset
-                  </button>
-                  <button
-                    onClick={() => setShowResetNamesConfirm(false)}
-                    style={{ flex: 1, background: "#222", border: "1px solid #444", color: "#ccc", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer" }}
-                  >
-                    Cancel
+                    Save & Close
                   </button>
                 </div>
               </div>
-            ) : (
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
-                <button onClick={() => setShowResetNamesConfirm(true)} style={{ background: "none", border: "1px solid #C45A5A33", color: "#C45A5A", padding: "8px 14px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
-                  Reset All
-                </button>
-                <button onClick={() => setShowEditModal(false)} style={{ background: "#5B8A6A", border: "none", color: "white", padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                  Done
-                </button>
-              </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Force PIN Setup Overlay (First Use Security Enforcement) */}
+      {isStorageLoaded && (lockPin === "" || lockPin === "1234") && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(7, 7, 10, 0.85)", backdropFilter: "blur(20px)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          zIndex: 9998, padding: 24, animation: "fadeIn 0.4s ease"
+        }}>
+          <div style={{
+            background: "linear-gradient(135deg, #161624 0%, #0F0F1A 100%)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 24,
+            padding: "48px 36px", maxWidth: 420, width: "100%", textAlign: "center",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 24,
+            boxShadow: "0 0 50px rgba(91, 138, 106, 0.1), 0 20px 50px rgba(0,0,0,0.7)"
+          }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: "50%", background: "rgba(91, 138, 106, 0.1)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32,
+              border: "1px solid rgba(91, 138, 106, 0.2)", marginBottom: 4
+            }}>
+              🛡️
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#E8E4DC", letterSpacing: "-0.5px" }}>Set Security PIN</h2>
+              <p style={{ margin: 0, fontSize: 13, color: "#8A8A9A", lineHeight: 1.6 }}>
+                To protect your decision-mapping privacy on shared devices, please set a custom security PIN. This will be required to unlock your session after 15 minutes of inactivity.
+              </p>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+              <input
+                type="text"
+                placeholder="Enter new PIN (e.g. 5829)"
+                value={setupPinInput}
+                onChange={e => {
+                  const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                  setSetupPinInput(val);
+                  setSetupPinError(false);
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    if (setupPinInput.length < 4) {
+                      setSetupPinError(true);
+                    } else if (setupPinInput === "1234") {
+                      alert("For security, '1234' is not allowed as a PIN. Please set a custom PIN.");
+                    } else {
+                      setLockPin(setupPinInput);
+                      setSetupPinInput("");
+                      setSetupPinError(false);
+                    }
+                  }
+                }}
+                style={{
+                  width: "100%", background: "rgba(0, 0, 0, 0.3)", border: setupPinError ? "1px solid #C45A5A" : "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: 12, padding: "14px 18px", color: "#E8E4DC", fontSize: 15,
+                  textAlign: "center", letterSpacing: "2px", outline: "none", transition: "all 0.2s"
+                }}
+              />
+              {setupPinError ? (
+                <span style={{ color: "#C45A5A", fontSize: 12, fontWeight: 500 }}>PIN must be at least 4 characters long.</span>
+              ) : (
+                <span style={{ color: "#555", fontSize: 11 }}>Use letters or numbers. Minimum 4 characters.</span>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                if (setupPinInput.length < 4) {
+                  setSetupPinError(true);
+                } else if (setupPinInput === "1234") {
+                  alert("For security, '1234' is not allowed as a PIN. Please set a custom PIN.");
+                } else {
+                  setLockPin(setupPinInput);
+                  setSetupPinInput("");
+                  setSetupPinError(false);
+                }
+              }}
+              style={{
+                width: "100%", background: "#5B8A6A", color: "white", border: "none",
+                borderRadius: 12, padding: "14px 24px", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", transition: "all 0.2s", letterSpacing: "0.5px"
+              }}
+              onMouseEnter={e => (e.target as HTMLElement).style.background = "#6C9C7B"}
+              onMouseLeave={e => (e.target as HTMLElement).style.background = "#5B8A6A"}
+            >
+              Confirm PIN
+            </button>
           </div>
         </div>
       )}
@@ -1243,30 +1458,62 @@ export default function PathMapperApp() {
       {isLocked && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(10, 10, 15, 0.8)", backdropFilter: "blur(12px)",
+          background: "rgba(7, 7, 10, 0.85)", backdropFilter: "blur(20px)",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           zIndex: 9999, padding: 24, animation: "fadeIn 0.3s ease"
         }}>
           <div style={{
-            background: "#161622", border: "1px solid #2A2A4E", borderRadius: 20,
-            padding: "40px 32px", maxWidth: 400, width: "100%", textAlign: "center",
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
-            boxShadow: "0 12px 40px rgba(0,0,0,0.6)"
+            background: "linear-gradient(135deg, #161624 0%, #0F0F1A 100%)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 24,
+            padding: "48px 36px", maxWidth: 420, width: "100%", textAlign: "center",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 24,
+            boxShadow: "0 0 50px rgba(91, 138, 106, 0.05), 0 20px 50px rgba(0,0,0,0.7)"
           }}>
-            <div style={{ fontSize: 48 }}>🔒</div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#E8E4DC" }}>Session Locked</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "#8A8A9A", lineHeight: 1.6 }}>
-              For your privacy, this decision-mapping session has been locked due to 15 minutes of inactivity.
-            </p>
+            <div style={{
+              width: 72, height: 72, borderRadius: "50%", background: "rgba(255, 255, 255, 0.03)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32,
+              border: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: 4
+            }}>
+              🔒
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#E8E4DC", letterSpacing: "-0.5px" }}>Session Locked</h2>
+              <p style={{ margin: 0, fontSize: 13, color: "#8A8A9A", lineHeight: 1.6 }}>
+                For your privacy, this decision-mapping session has been locked due to 15 minutes of inactivity. Enter your unlock PIN to resume.
+              </p>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+              <input
+                type="password"
+                placeholder="Enter PIN"
+                value={pinInput}
+                onChange={e => {
+                  setPinInput(e.target.value);
+                  setPinError(false);
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") handleUnlock();
+                }}
+                style={{
+                  width: "100%", background: "rgba(0, 0, 0, 0.3)", border: pinError ? "1px solid #C45A5A" : "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: 12, padding: "14px 18px", color: "#E8E4DC", fontSize: 15,
+                  textAlign: "center", letterSpacing: "4px", outline: "none", transition: "all 0.2s"
+                }}
+              />
+              {pinError && (
+                <span style={{ color: "#C45A5A", fontSize: 12, fontWeight: 500 }}>Incorrect PIN. Please try again.</span>
+              )}
+            </div>
+
             <button
-              onClick={() => {
-                setIsLocked(false);
-                lastActivityRef.current = Date.now();
-              }}
+              onClick={handleUnlock}
               style={{
                 width: "100%", background: "#5B8A6A", color: "white", border: "none",
-                borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 600,
-                cursor: "pointer", transition: "background 0.15s"
+                borderRadius: 12, padding: "14px 24px", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", transition: "all 0.2s", letterSpacing: "0.5px"
               }}
               onMouseEnter={e => (e.target as HTMLElement).style.background = "#6C9C7B"}
               onMouseLeave={e => (e.target as HTMLElement).style.background = "#5B8A6A"}
