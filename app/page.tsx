@@ -37,72 +37,55 @@ const dimLabels: Record<string, string> = {
   stability: "Stability",
 };
 
-// ─── Encryption Helpers (Responsible AI) ──────────────────────────────────────
-function rc4(key: string, str: string): string {
-  const s = [];
-  let i = 0, j = 0, x = 0;
-  for (i = 0; i < 256; i++) {
-    s[i] = i;
-  }
-  for (i = 0; i < 256; i++) {
-    j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
-    x = s[i];
-    s[i] = s[j];
-    s[j] = x;
-  }
-  i = 0;
-  j = 0;
-  let res = "";
-  for (let y = 0; y < str.length; y++) {
-    i = (i + 1) % 256;
-    j = (j + s[i]) % 256;
-    x = s[i];
-    s[i] = s[j];
-    s[j] = x;
-    res += String.fromCharCode(str.charCodeAt(y) ^ s[(s[i] + s[j]) % 256]);
-  }
-  return res;
+// ─── Encryption Helpers (Responsible AI - AES-GCM Web Crypto) ─────────────────
+async function getCryptoKey(password: string): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const rawKey = enc.encode(password);
+  const hash = await window.crypto.subtle.digest("SHA-256", rawKey);
+  return window.crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt", "decrypt"]
+  );
 }
 
-function encrypt(key: string, data: string): string {
+async function encryptAES(password: string, plaintext: string): Promise<string> {
   try {
-    const encrypted = rc4(key, data);
-    let hex = "";
-    for (let i = 0; i < encrypted.length; i++) {
-      hex += encrypted.charCodeAt(i).toString(16).padStart(2, "0");
-    }
-    return hex;
+    const key = await getCryptoKey(password);
+    const enc = new TextEncoder();
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await window.crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      enc.encode(plaintext)
+    );
+    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(ciphertext), iv.length);
+    return btoa(String.fromCharCode(...combined));
   } catch (e) {
-    return data;
+    console.error("Encryption failed", e);
+    return plaintext;
   }
 }
 
-function decrypt(key: string, hex: string): string {
+async function decryptAES(password: string, base64: string): Promise<string> {
   try {
-    let encrypted = "";
-    for (let i = 0; i < hex.length; i += 2) {
-      encrypted += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
-    }
-    return rc4(key, encrypted);
+    const key = await getCryptoKey(password);
+    const combined = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      ciphertext
+    );
+    const dec = new TextDecoder();
+    return dec.decode(decrypted);
   } catch (e) {
-    return hex;
-  }
-}
-
-function safeParseDecrypted(key: string, raw: string | null) {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    try {
-      return JSON.parse(trimmed);
-    } catch (e) {}
-  }
-  try {
-    const decrypted = decrypt(key, trimmed);
-    return JSON.parse(decrypted);
-  } catch (e) {
-    console.error("Failed to decrypt or parse storage data", e);
-    return null;
+    return base64;
   }
 }
 
@@ -314,6 +297,8 @@ export default function PathMapperApp() {
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [showRateLimitCard, setShowRateLimitCard] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
@@ -335,39 +320,83 @@ export default function PathMapperApp() {
   // 1. Mount Effect: Load data from localStorage safely
   useEffect(() => {
     setHasMounted(true);
-    try {
-      const storedNames = localStorage.getItem("pathmapper_custom_names");
-      if (storedNames) {
-        const parsed = safeParseDecrypted(encryptionKey, storedNames);
-        if (parsed) setCustomNames(parsed);
-      }
-      
-      const storedSessions = localStorage.getItem("pathmapper_sessions");
-      if (storedSessions) {
-        const parsed = safeParseDecrypted(encryptionKey, storedSessions) as ChatSession[] | null;
-        if (parsed) {
-          setSessions(parsed);
-          
-          const activeId = localStorage.getItem("pathmapper_current_session_id");
-          if (activeId) {
-            const activeSession = parsed.find(s => s.id === activeId);
-            if (activeSession) {
-              isSwitchingRef.current = true;
-              setCurrentSessionId(activeId);
-              setMessages(activeSession.messages);
-              setPipeline(activeSession.pipeline);
-              setStarted(true);
-              setTimeout(() => {
-                isSwitchingRef.current = false;
-              }, 0);
+    const load = async () => {
+      try {
+        const storedNames = localStorage.getItem("pathmapper_custom_names");
+        if (storedNames) {
+          let parsed = null;
+          const trimmed = storedNames.trim();
+          if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            parsed = JSON.parse(trimmed);
+          } else {
+            const decrypted = await decryptAES(encryptionKey, trimmed);
+            parsed = JSON.parse(decrypted);
+          }
+          if (parsed) setCustomNames(parsed);
+        }
+        
+        const storedSessions = localStorage.getItem("pathmapper_sessions");
+        if (storedSessions) {
+          let parsed: ChatSession[] | null = null;
+          const trimmed = storedSessions.trim();
+          if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            parsed = JSON.parse(trimmed);
+          } else {
+            const decrypted = await decryptAES(encryptionKey, trimmed);
+            parsed = JSON.parse(decrypted);
+          }
+          if (parsed) {
+            setSessions(parsed);
+            
+            const activeId = localStorage.getItem("pathmapper_current_session_id");
+            if (activeId) {
+              const activeSession = parsed.find(s => s.id === activeId);
+              if (activeSession) {
+                isSwitchingRef.current = true;
+                setCurrentSessionId(activeId);
+                setMessages(activeSession.messages);
+                setPipeline(activeSession.pipeline);
+                setStarted(true);
+                setTimeout(() => {
+                  isSwitchingRef.current = false;
+                }, 0);
+              }
             }
           }
         }
+      } catch (e) {
+        console.error("Failed to load local storage:", e);
       }
-    } catch (e) {
-      console.error("Failed to load local storage:", e);
-    }
+    };
+    load();
   }, [encryptionKey]);
+
+  // 1.5. Auto-save Sessions and Custom Names when they change (Async Encryption)
+  useEffect(() => {
+    if (!hasMounted) return;
+    const save = async () => {
+      try {
+        const encrypted = await encryptAES(encryptionKey, JSON.stringify(sessions));
+        localStorage.setItem("pathmapper_sessions", encrypted);
+      } catch (e) {
+        console.error("Failed to save sessions:", e);
+      }
+    };
+    save();
+  }, [sessions, encryptionKey, hasMounted]);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+    const save = async () => {
+      try {
+        const encrypted = await encryptAES(encryptionKey, JSON.stringify(customNames));
+        localStorage.setItem("pathmapper_custom_names", encrypted);
+      } catch (e) {
+        console.error("Failed to save custom names:", e);
+      }
+    };
+    save();
+  }, [customNames, encryptionKey, hasMounted]);
 
   // 2. Sync Effect: Auto-save messages and pipeline state for current session
   useEffect(() => {
@@ -403,10 +432,9 @@ export default function PathMapperApp() {
       }
       
       next.sort((a, b) => b.updatedAt - a.updatedAt);
-      localStorage.setItem("pathmapper_sessions", encrypt(encryptionKey, JSON.stringify(next)));
       return next;
     });
-  }, [messages, pipeline, currentSessionId, hasMounted, encryptionKey]);
+  }, [messages, pipeline, currentSessionId, hasMounted]);
 
   // 3. Wiping localStorage on Logout
   const prevUserRef = useRef<any>(null);
@@ -505,7 +533,6 @@ export default function PathMapperApp() {
         }
         return s;
       });
-      localStorage.setItem("pathmapper_sessions", encrypt(encryptionKey, JSON.stringify(next)));
       return next;
     });
     
@@ -522,7 +549,6 @@ export default function PathMapperApp() {
   const confirmDeleteSession = (id: string) => {
     setSessions(prev => {
       const next = prev.filter(s => s.id !== id);
-      localStorage.setItem("pathmapper_sessions", encrypt(encryptionKey, JSON.stringify(next)));
       return next;
     });
 
@@ -561,6 +587,12 @@ export default function PathMapperApp() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.error === "rate_limit_exceeded") {
+          setShowRateLimitCard(true);
+          setIsLoading(false);
+          setTypingPersona(null);
+          return;
+        }
         throw new Error(data.detail ?? data.error ?? `Server error ${res.status}`);
       }
 
@@ -649,6 +681,9 @@ export default function PathMapperApp() {
           .mobile-menu-btn {
             display: flex !important;
           }
+          .desktop-sidebar-toggle-btn {
+            display: none !important;
+          }
           .main-chat-container {
             border-left: none !important;
             border-right: none !important;
@@ -660,6 +695,9 @@ export default function PathMapperApp() {
           }
           .mobile-menu-btn {
             display: none !important;
+          }
+          .desktop-sidebar-toggle-btn {
+            display: flex !important;
           }
         }
         /* Custom scrollbar for sidebar */
@@ -676,126 +714,142 @@ export default function PathMapperApp() {
       `}</style>
 
       {/* DESKTOP SIDEBAR */}
-      <aside className="desktop-sidebar" style={{ display: "flex", flexDirection: "column", width: 260, borderRight: "1px solid #1E1E2E", background: "#0A0A10", flexShrink: 0, padding: "16px 12px", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, paddingLeft: 8 }}>
-          <span>🗺️</span> PathMapper
-        </div>
-        
-        <button onClick={reset} style={{ width: "100%", padding: "10px", borderRadius: 8, background: "#1C1C2C", color: "#E8E4DC", border: "1px solid #2A2A3E", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background 0.2s" }}>
-          <span>➕</span> New Decision
-        </button>
+      <aside 
+        className="desktop-sidebar" 
+        style={{ 
+          display: "flex", 
+          flexDirection: "column", 
+          width: isSidebarOpen ? 260 : 0, 
+          borderRight: isSidebarOpen ? "1px solid #1E1E2E" : "0px solid transparent", 
+          background: "#0A0A10", 
+          flexShrink: 0, 
+          padding: isSidebarOpen ? "16px 12px" : "16px 0", 
+          gap: 16,
+          overflow: "hidden",
+          transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
+        }}
+      >
+        <div style={{ width: 236, display: "flex", flexDirection: "column", gap: 16, height: "100%", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, paddingLeft: 8 }}>
+            <span>🗺️</span> PathMapper
+          </div>
+          
+          <button onClick={reset} style={{ width: "100%", padding: "10px", borderRadius: 8, background: "#1C1C2C", color: "#E8E4DC", border: "1px solid #2A2A3E", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background 0.2s" }}>
+            <span>➕</span> New Decision
+          </button>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }} className="sidebar-scroll">
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#555", letterSpacing: "0.8px", textTransform: "uppercase", paddingLeft: 8, marginTop: 10 }}>History</div>
-          {sessions.length === 0 ? (
-            <div style={{ padding: "12px 8px", fontSize: 12, color: "#555", fontStyle: "italic" }}>No previous decisions yet.</div>
-          ) : (
-            sessions.map(s => {
-              const isActive = currentSessionId === s.id;
-              const isEditing = editingSessionId === s.id;
-              const isDeleting = sessionToDeleteId === s.id;
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }} className="sidebar-scroll">
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#555", letterSpacing: "0.8px", textTransform: "uppercase", paddingLeft: 8, marginTop: 10 }}>History</div>
+            {sessions.length === 0 ? (
+              <div style={{ padding: "12px 8px", fontSize: 12, color: "#555", fontStyle: "italic" }}>No previous decisions yet.</div>
+            ) : (
+              sessions.map(s => {
+                const isActive = currentSessionId === s.id;
+                const isEditing = editingSessionId === s.id;
+                const isDeleting = sessionToDeleteId === s.id;
 
-              if (isDeleting) {
+                if (isDeleting) {
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px", borderRadius: 8,
+                        background: "#2A1515", border: "1px solid #C45A5A44", animation: "fadeIn 0.2s ease"
+                      }}
+                    >
+                      <div style={{ fontSize: 11, color: "#F0A0A0", fontWeight: 600 }}>Delete this decision?</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() => confirmDeleteSession(s.id)}
+                          style={{ flex: 1, background: "#C45A5A", border: "none", color: "white", borderRadius: 4, padding: "4px 8px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                        >
+                          Yes, Delete
+                        </button>
+                        <button
+                          onClick={() => setSessionToDeleteId(null)}
+                          style={{ flex: 1, background: "#222", border: "1px solid #444", color: "#ccc", borderRadius: 4, padding: "4px 8px", fontSize: 11, cursor: "pointer" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={s.id}
-                    onClick={e => e.stopPropagation()}
+                    onClick={() => loadSession(s)}
                     style={{
-                      display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px", borderRadius: 8,
-                      background: "#2A1515", border: "1px solid #C45A5A44", animation: "fadeIn 0.2s ease"
+                      display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 8,
+                      background: isActive ? "#161B2A" : "transparent",
+                      border: `1px solid ${isActive ? "#3E5B8E66" : "transparent"}`,
+                      cursor: "pointer", transition: "all 0.15s", color: isActive ? "#9FC0F0" : "#A0A0B0",
+                      position: "relative"
+                    }}
+                    onMouseEnter={e => {
+                      if (!isActive && !isEditing) e.currentTarget.style.background = "#141420";
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive && !isEditing) e.currentTarget.style.background = "transparent";
                     }}
                   >
-                    <div style={{ fontSize: 11, color: "#F0A0A0", fontWeight: 600 }}>Delete this decision?</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => confirmDeleteSession(s.id)}
-                        style={{ flex: 1, background: "#C45A5A", border: "none", color: "white", borderRadius: 4, padding: "4px 8px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
-                      >
-                        Yes, Delete
-                      </button>
-                      <button
-                        onClick={() => setSessionToDeleteId(null)}
-                        style={{ flex: 1, background: "#222", border: "1px solid #444", color: "#ccc", borderRadius: 4, padding: "4px 8px", fontSize: 11, cursor: "pointer" }}
-                      >
-                        Cancel
-                      </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1, marginRight: 8 }}>
+                      {isEditing ? (
+                        <input
+                          value={editingSessionTitle}
+                          onChange={e => setEditingSessionTitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") saveSessionTitle(s.id);
+                            if (e.key === "Escape") setEditingSessionId(null);
+                          }}
+                          onBlur={() => saveSessionTitle(s.id)}
+                          onClick={e => e.stopPropagation()}
+                          autoFocus
+                          style={{
+                            background: "#0F0F16", border: "1px solid #3E5B8E", borderRadius: 4,
+                            padding: "4px 6px", color: "#E8E4DC", fontSize: 13, width: "100%", outline: "none"
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {s.title}
+                          </div>
+                          <div style={{ fontSize: 10, color: "#555" }}>
+                            {new Date(s.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  key={s.id}
-                  onClick={() => loadSession(s)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 8,
-                    background: isActive ? "#161B2A" : "transparent",
-                    border: `1px solid ${isActive ? "#3E5B8E66" : "transparent"}`,
-                    cursor: "pointer", transition: "all 0.15s", color: isActive ? "#9FC0F0" : "#A0A0B0",
-                    position: "relative"
-                  }}
-                  onMouseEnter={e => {
-                    if (!isActive && !isEditing) e.currentTarget.style.background = "#141420";
-                  }}
-                  onMouseLeave={e => {
-                    if (!isActive && !isEditing) e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1, marginRight: 8 }}>
-                    {isEditing ? (
-                      <input
-                        value={editingSessionTitle}
-                        onChange={e => setEditingSessionTitle(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") saveSessionTitle(s.id);
-                          if (e.key === "Escape") setEditingSessionId(null);
-                        }}
-                        onBlur={() => saveSessionTitle(s.id)}
-                        onClick={e => e.stopPropagation()}
-                        autoFocus
-                        style={{
-                          background: "#0F0F16", border: "1px solid #3E5B8E", borderRadius: 4,
-                          padding: "4px 6px", color: "#E8E4DC", fontSize: 13, width: "100%", outline: "none"
-                        }}
-                      />
-                    ) : (
-                      <>
-                        <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {s.title}
-                        </div>
-                        <div style={{ fontSize: 10, color: "#555" }}>
-                          {new Date(s.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        </div>
-                      </>
+                    {!isEditing && (
+                      <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                        <button
+                          onClick={e => startRenameSession(s, e)}
+                          style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 12, padding: 4 }}
+                          title="Rename decision"
+                          onMouseEnter={e => e.currentTarget.style.color = "#E8E4DC"}
+                          onMouseLeave={e => e.currentTarget.style.color = "#666"}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={e => askDeleteSession(s.id, e)}
+                          style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 12, padding: 4 }}
+                          title="Delete history"
+                          onMouseEnter={e => e.currentTarget.style.color = "#E05A5A"}
+                          onMouseLeave={e => e.currentTarget.style.color = "#666"}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     )}
                   </div>
-                  {!isEditing && (
-                    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <button
-                        onClick={e => startRenameSession(s, e)}
-                        style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 12, padding: 4 }}
-                        title="Rename decision"
-                        onMouseEnter={e => e.currentTarget.style.color = "#E8E4DC"}
-                        onMouseLeave={e => e.currentTarget.style.color = "#666"}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={e => askDeleteSession(s.id, e)}
-                        style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 12, padding: 4 }}
-                        title="Delete history"
-                        onMouseEnter={e => e.currentTarget.style.color = "#E05A5A"}
-                        onMouseLeave={e => e.currentTarget.style.color = "#666"}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       </aside>
 
@@ -931,22 +985,49 @@ export default function PathMapperApp() {
         {/* Authenticated Application Header Row */}
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #1E1E2E", flexShrink: 0 }}>
           {/* Left Side: App Title and Subtitle */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px" }}>
-              <button
-                onClick={() => setShowHistoryDrawer(true)}
-                className="mobile-menu-btn"
-                style={{ display: "none", background: "none", border: "none", color: "#E8E4DC", cursor: "pointer", fontSize: 18, padding: 0, marginRight: 4 }}
-                aria-label="Open History"
-              >
-                ☰
-              </button>
-              <span>🗺️</span> PathMapper
-              <span style={{ fontSize: 11, background: "#1E2A3A", color: "#6A9FD8", padding: "2px 8px", borderRadius: 20, fontWeight: 600, letterSpacing: "0.5px" }}>BETA</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Desktop Toggle Sidebar Button */}
+            <button
+              onClick={() => setIsSidebarOpen(prev => !prev)}
+              className="desktop-sidebar-toggle-btn"
+              style={{
+                background: "none", border: "none", color: "#8A8A9A", cursor: "pointer",
+                padding: 6, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 6, transition: "background 0.15s, color 0.15s"
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#1C1C2C";
+                e.currentTarget.style.color = "#E8E4DC";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "none";
+                e.currentTarget.style.color = "#8A8A9A";
+              }}
+              title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="M9 3v18" />
+              </svg>
+            </button>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px" }}>
+                <button
+                  onClick={() => setShowHistoryDrawer(true)}
+                  className="mobile-menu-btn"
+                  style={{ display: "none", background: "none", border: "none", color: "#E8E4DC", cursor: "pointer", fontSize: 18, padding: 0, marginRight: 4 }}
+                  aria-label="Open History"
+                >
+                  ☰
+                </button>
+                <span>🗺️</span> PathMapper
+                <span style={{ fontSize: 11, background: "#1E2A3A", color: "#6A9FD8", padding: "2px 8px", borderRadius: 20, fontWeight: 600, letterSpacing: "0.5px" }}>BETA</span>
+              </div>
+              <span style={{ color: "#8A8A9A", fontSize: 12 }}>
+                Active friends: {getFriendName("Sam")}, {getFriendName("Dev")}, {getFriendName("Mina")}, {getFriendName("Theo")}, {getFriendName("Priya")}, {getFriendName("Jordan")}
+              </span>
             </div>
-            <span style={{ color: "#8A8A9A", fontSize: 12 }}>
-              Active friends: {getFriendName("Sam")}, {getFriendName("Dev")}, {getFriendName("Mina")}, {getFriendName("Theo")}, {getFriendName("Priya")}, {getFriendName("Jordan")}
-            </span>
           </div>
 
           {/* Right Side: Navigation Actions & Auth Layout */}
@@ -1009,6 +1090,34 @@ export default function PathMapperApp() {
             </div>
           )}
 
+          {showRateLimitCard && (
+            <div style={{
+              background: "#2A1515", border: "1px solid #C45A5A44", borderRadius: 12,
+              padding: 16, display: "flex", flexDirection: "column", gap: 12,
+              animation: "fadeIn 0.2s ease"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 20 }}>⚠️</span>
+                <div style={{ fontSize: 13, color: "#F0A0A0", fontWeight: 600 }}>API Quota Limit Reached</div>
+              </div>
+              <p style={{ margin: 0, fontSize: 12, color: "#D8A0A0", lineHeight: 1.5 }}>
+                We've temporarily run out of AI API tokens for this demo. Please contact the developers at <strong>devs@pathmapper.ai</strong> to get this replenished, or try again shortly.
+              </p>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setShowRateLimitCard(false)}
+                  style={{
+                    background: "#222", border: "1px solid #444", color: "#ccc",
+                    padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+                    fontWeight: 600
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
 
@@ -1055,6 +1164,10 @@ export default function PathMapperApp() {
               >↑</button>
             </div>
           )}
+          
+          <div style={{ textAlign: "center", fontSize: 10, color: "#5F5F6F", marginTop: 8, letterSpacing: "0.2px" }}>
+            PathMapper uses AI personas to help you think through your decision.
+          </div>
         </div>
       </div>
 
@@ -1079,11 +1192,7 @@ export default function PathMapperApp() {
                     value={customNames[key] || ""}
                     onChange={e => {
                       const val = e.target.value;
-                      setCustomNames(prev => {
-                        const next = { ...prev, [key]: val };
-                        localStorage.setItem("pathmapper_custom_names", encrypt(encryptionKey, JSON.stringify(next)));
-                        return next;
-                      });
+                      setCustomNames(prev => ({ ...prev, [key]: val }));
                     }}
                     style={{ background: "#0F0F16", border: "1px solid #2A2A3E", borderRadius: 8, padding: "8px 10px", color: "#E8E4DC", fontSize: 13, outline: "none" }}
                   />
@@ -1097,7 +1206,6 @@ export default function PathMapperApp() {
                   <button
                     onClick={() => {
                       setCustomNames({});
-                      localStorage.removeItem("pathmapper_custom_names");
                       setShowResetNamesConfirm(false);
                     }}
                     style={{ flex: 1, background: "#C45A5A", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600 }}

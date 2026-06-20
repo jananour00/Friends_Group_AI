@@ -652,8 +652,15 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Chat pipeline error:", message);
+    const isRateLimit = message.toLowerCase().includes("429") || 
+                        message.toLowerCase().includes("quota") || 
+                        message.toLowerCase().includes("rate limit") || 
+                        message.toLowerCase().includes("exhausted");
     return NextResponse.json(
-      { error: "Pipeline failed", detail: message },
+      { 
+        error: isRateLimit ? "rate_limit_exceeded" : "Pipeline failed", 
+        detail: message 
+      },
       { status: 500 }
     );
   }
