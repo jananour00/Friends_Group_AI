@@ -21,12 +21,12 @@ const INITIAL: PipelineState = {
 };
 
 const PERSONAS = {
-  Sam: { defaultName: "Cora", color: "#25D366", bg: "#0D2818", emoji: "💬", subtitle: "the Coordinator" },
-  Dev: { defaultName: "Felix", color: "#FF6B6B", bg: "#2D0F0F", emoji: "🎯", subtitle: "the Fact Checker" },
-  Mina: { defaultName: "Paige", color: "#FFB347", bg: "#2D1A08", emoji: "🌸", subtitle: "the Pattern Detector" },
-  Theo: { defaultName: "Carter", color: "#4ECDC4", bg: "#0D2B28", emoji: "📋", subtitle: "the Categorizer" },
-  Priya: { defaultName: "Connie", color: "#A78BFA", bg: "#1F1640", emoji: "🌙", subtitle: "the Confidence Meter" },
-  Jordan: { defaultName: "Blair", color: "#FCD34D", bg: "#2D2408", emoji: "⚡", subtitle: "the Blindspot Finder" },
+  Sam: { defaultName: "Cora", color: "#00FF88", bg: "#0A1F1F", emoji: "💬", subtitle: "the Coordinator", accent: "#00FF88" },
+  Dev: { defaultName: "Felix", color: "#FF006E", bg: "#1F0A15", emoji: "🎯", subtitle: "the Fact Checker", accent: "#FF006E" },
+  Mina: { defaultName: "Paige", color: "#FFD700", bg: "#1F1A08", emoji: "🌸", subtitle: "the Pattern Detector", accent: "#FFD700" },
+  Theo: { defaultName: "Carter", color: "#00D9FF", bg: "#0A1F2E", emoji: "📋", subtitle: "the Categorizer", accent: "#00D9FF" },
+  Priya: { defaultName: "Connie", color: "#B537F2", bg: "#15080F", emoji: "🌙", subtitle: "the Confidence Meter", accent: "#B537F2" },
+  Jordan: { defaultName: "Blair", color: "#FF9500", bg: "#1F1208", emoji: "⚡", subtitle: "the Blindspot Finder", accent: "#FF9500" },
 } as const;
 
 const dimLabels: Record<string, string> = {
@@ -195,25 +195,47 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
   const isUser = msg.role === "user";
   const persona = msg.persona ? PERSONAS[msg.persona as keyof typeof PERSONAS] : null;
   const getFriendName = (name: string) => customNames[name] || (PERSONAS[name as keyof typeof PERSONAS] as any)?.defaultName || name;
+  const [showCopyFeedback, setShowCopyFeedback] = false;
+  const [hoveredBubble, setHoveredBubble] = false;
+
+  const handleCopy = () => {
+    const textToCopy = msg.type === "narratives" ? "Narratives received" : msg.type === "stance" ? "Stance analysis received" : msg.content;
+    navigator.clipboard.writeText(textToCopy);
+    setShowCopyFeedback(true);
+    setTimeout(() => setShowCopyFeedback(false), 2000);
+  };
+
+  const messageTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 
   return (
-    <div style={{ display: "flex", gap: 12, maxWidth: "92%", alignSelf: isUser ? "flex-end" : "flex-start", flexDirection: isUser ? "row-reverse" : "row", animation: "slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)" }}>
+    <div style={{ display: "flex", gap: 12, maxWidth: "92%", alignSelf: isUser ? "flex-end" : "flex-start", flexDirection: isUser ? "row-reverse" : "row", animation: "slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)", position: "relative" }}>
       <style>{`
         @keyframes slideIn {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
       `}</style>
       {!isUser && persona && (
         <div style={{
           width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 18, flexShrink: 0, marginTop: 16, background: persona.bg, border: `2.5px solid ${persona.color}`,
-          boxShadow: `0 0 12px ${persona.color}33`
-        }}>{persona.emoji}</div>
+          boxShadow: `0 0 16px ${persona.color}66`, cursor: "pointer", transition: "all 0.3s ease"
+        }}
+          onMouseEnter={e => {
+            e.currentTarget.style.boxShadow = `0 0 24px ${persona.color}`;
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.boxShadow = `0 0 16px ${persona.color}66`;
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+          title={`${getFriendName(msg.persona)} • Online`}
+        >{persona.emoji}</div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {!isUser && msg.persona && (
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", marginLeft: 4, color: persona?.color, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.8px", marginLeft: 4, color: persona?.color, textTransform: "uppercase" }}>
             {getFriendName(msg.persona)}
           </div>
         )}
@@ -221,12 +243,30 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
           padding: "12px 16px",
           borderRadius: isUser ? "18px 4px 18px 18px" : "18px 18px 4px 18px",
           fontSize: 14, lineHeight: 1.6,
-          background: isUser ? "#25D366" : (persona?.bg ?? "#111827"),
-          color: isUser ? "#ffffff" : "#E5E7EB",
-          border: `1px solid ${isUser ? "#1da85133" : (persona ? persona.color + "55" : "#374151")}`,
+          background: isUser ? "#00FF88" : (persona?.bg ?? "#0A0E27"),
+          color: isUser ? "#0A0E27" : "#E5E7EB",
+          border: `2px solid ${isUser ? "#00FF88" : (persona?.color ?? "#1F3A3A")}`,
           maxWidth: msg.type === "narratives" ? 560 : undefined,
-          boxShadow: `0 1px 3px ${isUser ? "#00000020" : "#00000040"}`,
-        }}>
+          boxShadow: `0 0 20px ${isUser ? "#00FF8844" : (persona?.color + "44" ?? "#00000040")}`,
+          cursor: "pointer", transition: "all 0.3s ease", position: "relative",
+          onMouseEnter: (e: any) => {
+            e.currentTarget.style.boxShadow = `0 0 32px ${isUser ? "#00FF88" : (persona?.color ?? "#0A0E27")}`;
+            setHoveredBubble(true);
+          },
+          onMouseLeave: (e: any) => {
+            e.currentTarget.style.boxShadow = `0 0 20px ${isUser ? "#00FF8844" : (persona?.color + "44" ?? "#00000040")}`;
+            setHoveredBubble(false);
+          }
+        } as any}
+          onMouseEnter={(e: any) => {
+            e.currentTarget.style.boxShadow = `0 0 32px ${isUser ? "#00FF88" : (persona?.color ?? "#0A0E27")}`;
+            setHoveredBubble(true);
+          }}
+          onMouseLeave={(e: any) => {
+            e.currentTarget.style.boxShadow = `0 0 20px ${isUser ? "#00FF8844" : (persona?.color + "44" ?? "#00000040")}`;
+            setHoveredBubble(false);
+          }}
+        >
           {msg.type === "narratives" && msg.metadata ? (
             <NarrativeCards
               narratives={(msg.metadata as { narratives: NarrativeOutput; scores: ScoringOutput }).narratives}
@@ -238,6 +278,92 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
             <p style={{ margin: 0 }}>{msg.content}</p>
           )}
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: isUser ? "auto" : 4, fontSize: 11, color: "#9CA3AF" }}>
+          <span>{messageTime}</span>
+          {isUser && <span title="Message delivered">✓✓</span>}
+          {hoveredBubble && (
+            <button onClick={handleCopy} style={{
+              background: "none", border: "none", color: persona?.color ?? "#00FF88", cursor: "pointer", fontSize: 12, padding: 0,
+              transition: "all 0.3s ease", fontWeight: 600
+            }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "scale(1.2)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              title="Copy message"
+            >
+              {showCopyFeedback ? "✓ Copied" : "📋 Copy"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Group Info Panel ─────────────────────────────────────────────────────────
+function GroupInfoPanel({ customNames }: { customNames: Record<string, string> }) {
+  const getFriendName = (name: string) => customNames[name] || (PERSONAS[name as keyof typeof PERSONAS] as any)?.defaultName || name;
+  const personaKeys = Object.keys(PERSONAS) as (keyof typeof PERSONAS)[];
+
+  return (
+    <div style={{
+      width: 280, background: "#0A0E27", borderLeft: "2px solid #00FF8844", display: "flex", flexDirection: "column",
+      padding: "20px 16px", gap: 16, overflowY: "auto", boxShadow: "-4px 0 20px rgba(0,0,0,0.6)"
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: "#00FF88", letterSpacing: "1px", textTransform: "uppercase" }}>
+        Group Members
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {personaKeys.map(key => {
+          const persona = PERSONAS[key];
+          const name = getFriendName(key);
+          return (
+            <div key={key} style={{
+              display: "flex", gap: 12, alignItems: "center", padding: "12px", borderRadius: 10,
+              background: persona.bg, border: `1.5px solid ${persona.color}`, cursor: "pointer",
+              transition: "all 0.3s ease", boxShadow: `0 0 12px ${persona.color}44`,
+              onMouseEnter: (e: any) => {
+                e.currentTarget.style.boxShadow = `0 0 20px ${persona.color}`;
+                e.currentTarget.style.transform = "translateX(4px)";
+              },
+              onMouseLeave: (e: any) => {
+                e.currentTarget.style.boxShadow = `0 0 12px ${persona.color}44`;
+                e.currentTarget.style.transform = "translateX(0)";
+              }
+            } as any}
+              onMouseEnter={(e: any) => {
+                e.currentTarget.style.boxShadow = `0 0 20px ${persona.color}`;
+                e.currentTarget.style.transform = "translateX(4px)";
+              }}
+              onMouseLeave={(e: any) => {
+                e.currentTarget.style.boxShadow = `0 0 12px ${persona.color}44`;
+                e.currentTarget.style.transform = "translateX(0)";
+              }}
+            >
+              <div style={{
+                fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36,
+                borderRadius: "50%", background: persona.bg, border: `2px solid ${persona.color}`
+              }}>
+                {persona.emoji}
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: persona.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {name}
+                </div>
+                <div style={{ fontSize: 10, color: "#9CA3AF" }}>
+                  {persona.subtitle}
+                </div>
+              </div>
+              <div style={{
+                width: 10, height: 10, borderRadius: "50%", background: persona.color,
+                boxShadow: `0 0 8px ${persona.color}`, animation: "pulse 2s infinite"
+              }} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -335,6 +461,7 @@ export default function PathMapperApp() {
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
   const [sessionToDeleteId, setSessionToDeleteId] = useState<string | null>(null);
   const [showResetNamesConfirm, setShowResetNamesConfirm] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(started);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -748,7 +875,7 @@ export default function PathMapperApp() {
   const typingConfig = typingPersona ? (PERSONAS[typingPersona as keyof typeof PERSONAS] || PERSONAS.Sam) : PERSONAS.Sam;
 
   return (
-    <div style={{ display: "flex", height: "100dvh", width: "100vw", background: "#0A0A10", color: "#E8E4DC", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100dvh", width: "100vw", background: "#0A0E27", color: "#E5E7EB", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflow: "hidden" }}>
       <style>{`
         @media (max-width: 768px) {
           .desktop-sidebar {
@@ -1056,10 +1183,11 @@ export default function PathMapperApp() {
       )}
 
       {/* MAIN CHAT AREA */}
-      <div className="main-chat-container" style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", background: "#0F1419", borderLeft: "1px solid #1F2937", borderRight: "1px solid #1F2937", position: "relative" }}>
+      <div style={{ display: "flex", flex: 1, height: "100%" }}>
+        <div className="main-chat-container" style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", background: "#0A0E27", borderLeft: "1px solid #1F3A3A", borderRight: "1px solid #1F3A3A", position: "relative" }}>
         
         {/* Authenticated Application Header Row */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid #1F2937", flexShrink: 0, backgroundColor: "#111827", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "2px solid #1F3A3A", flexShrink: 0, backgroundColor: "#0A0E27", boxShadow: "0 0 20px rgba(0, 255, 136, 0.1)" }}>
           {/* Left Side: App Title and Subtitle */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {/* Desktop Toggle Sidebar Button */}
@@ -1229,7 +1357,63 @@ export default function PathMapperApp() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: "12px 16px", borderTop: "1px solid #1E1E2E", flexShrink: 0, background: "#0F0F16" }}>
+        <div style={{ padding: "16px 20px", borderTop: "1px solid #1F3A3A", flexShrink: 0, background: "#0A0E27" }}>
+          {/* Export/Share Controls */}
+          {started && messages.length > 0 && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  const chat = messages.map(m => `${m.persona || 'You'}: ${m.content}`).join('\n');
+                  navigator.clipboard.writeText(chat);
+                  alert('Chat copied to clipboard!');
+                }}
+                style={{
+                  background: "#1F3A3A", border: "1px solid #00FF8844", color: "#00FF88", padding: "6px 12px",
+                  borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "#00FF8844";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0, 255, 136, 0.3)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "#1F3A3A";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+                title="Copy entire chat to clipboard"
+              >
+                📋 Copy Chat
+              </button>
+              <button
+                onClick={() => {
+                  const chat = messages.map(m => `${m.persona || 'You'}: ${m.content}`).join('\n');
+                  const blob = new Blob([chat], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `PathMapper-Chat-${Date.now()}.txt`;
+                  a.click();
+                }}
+                style={{
+                  background: "#1F3A3A", border: "1px solid #FFD70044", color: "#FFD700", padding: "6px 12px",
+                  borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "#FFD70044";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(255, 215, 0, 0.3)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "#1F3A3A";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+                title="Download chat as text file"
+              >
+                ⬇️ Export
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #1F3A3A", flexShrink: 0, background: "#0A0E27" }}>
           {isDone ? (
             <div style={{ textAlign: "center", fontSize: 12, color: "#555" }}>
               Analysis complete. {" "}
@@ -1261,11 +1445,25 @@ export default function PathMapperApp() {
                 onClick={() => send(input)}
                 disabled={isLoading || !input.trim()}
                 style={{
-                  width: 34, height: 34, borderRadius: "50%",
-                  background: isLoading || !input.trim() ? "#2A2A3E" : "#5B8A6A",
-                  border: "none", cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: isLoading || !input.trim() ? "#1F3A3A" : "#00FF88",
+                  border: `2px solid ${isLoading || !input.trim() ? "#1F3A3A" : "#00FF88"}`,
+                  cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, color: "white", fontSize: 16, transition: "background 0.15s"
+                  flexShrink: 0, color: isLoading || !input.trim() ? "#6B7280" : "#0A0E27", fontSize: 18, fontWeight: 700,
+                  transition: "all 0.3s ease", boxShadow: isLoading || !input.trim() ? "none" : "0 0 16px rgba(0, 255, 136, 0.5)"
+                }}
+                onMouseEnter={e => {
+                  if (!isLoading && input.trim()) {
+                    e.currentTarget.style.boxShadow = "0 0 24px rgba(0, 255, 136, 0.8)";
+                    e.currentTarget.style.transform = "scale(1.1)";
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isLoading && input.trim()) {
+                    e.currentTarget.style.boxShadow = "0 0 16px rgba(0, 255, 136, 0.5)";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }
                 }}
                 aria-label="Send"
               >↑</button>
@@ -1275,6 +1473,10 @@ export default function PathMapperApp() {
           <div style={{ textAlign: "center", fontSize: 10, color: "#5F5F6F", marginTop: 8, letterSpacing: "0.2px" }}>
             PathMapper uses AI personas to help you think through your decision.
           </div>
+        </div>
+
+        {/* GROUP INFO PANEL */}
+        {started && showGroupInfo && <GroupInfoPanel customNames={customNames} />}
         </div>
       </div>
 
