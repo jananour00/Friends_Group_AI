@@ -352,7 +352,6 @@ export default function PathMapperApp() {
               New decision
             </button>
           )}
-
           {/* Display when the user is completely signed out */}
           <SignedOut>
             <SignInButton mode="modal">
