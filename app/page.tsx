@@ -1,5 +1,5 @@
 "use client";
-import { UserButton, SignInButton, Show } from "@clerk/nextjs";
+import { UserButton, SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { ChatMessage, DimensionScores, NarrativeOutput, ScoringOutput, StanceOutput, PipelinePhase, PipelineState } from "@/types/pipeline";
@@ -344,7 +344,7 @@ export default function PathMapperApp() {
           </div>
           <span style={{ color: "#8A8A9A", fontSize: 12 }}>Active friends: Sam, Dev, Mina, Theo, Priya, Jordan</span>
         </div>
-  
+
         {/* Right Side: Navigation Actions & Auth Layout */}
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {started && (
@@ -352,20 +352,20 @@ export default function PathMapperApp() {
               New decision
             </button>
           )}
-    
+
           {/* Display when the user is completely signed out */}
-          <Show when="signed-out">
+          <SignedOut>
             <SignInButton mode="modal">
               <button style={{ background: "#5B8A6A", color: "white", border: "none", padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}>
                 Sign In
               </button>
             </SignInButton>
-          </Show>
+          </SignedOut>
 
           {/* Display when a valid session token is found */}
-          <Show when="signed-in">
+          <SignedIn>
             <UserButton />
-          </Show>
+          </SignedIn>
         </div>
       </header>
 
