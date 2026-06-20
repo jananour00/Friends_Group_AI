@@ -136,7 +136,7 @@ function TypingDots() {
 function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Record<string, string> }) {
   const isUser = msg.role === "user";
   const persona = msg.persona ? PERSONAS[msg.persona as keyof typeof PERSONAS] : null;
-  const getFriendName = (name: string) => customNames[name] || name;
+  const getFriendName = (name: string) => customNames[name] || (PERSONAS[name as keyof typeof PERSONAS] as any)?.defaultName || name;
 
   return (
     <div style={{ display: "flex", gap: 10, maxWidth: "92%", alignSelf: isUser ? "flex-end" : "flex-start", flexDirection: isUser ? "row-reverse" : "row", animation: "fadeIn 0.2s ease" }}>
@@ -181,10 +181,18 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
 // ─── Welcome Screen ───────────────────────────────────────────────────────────
 function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
   const examples = [
-    { label: "I'm deciding whether to stay at my current job or join a startup. The startup pays less but has equity and faster growth.", value: "I'm deciding whether to stay at my current job or join a startup. The startup pays less but has equity and faster growth." },
-    { label: "Should I move to Dubai for a better salary or stay close to family in Cairo? My partner's situation complicates things.", value: "Should I move to Dubai for a better salary or stay close to family in Cairo? My partner's situation complicates things." },
-    { label: "I'm torn between doing a master's degree or just working — I love learning but I need income now.", value: "I'm torn between doing a master's degree or just working — I love learning but I need income now." },
-    { label: "🧪 Test Case: Trigger all 5 friend checkpoints (Dev, Mina, Theo, Priya, Jordan)", value: "[TEST-ALL] I am trying to make a big decision: should I stay at my stable corporate job or join an early-stage startup? I guess maybe both options are good, but I keep thinking about the money, money, money. Also, I need to decide if I want to get married next year or move to Europe." },
+    {
+      label: "👤 Alex (25, Software Engineer) — Stay at stable job vs. join startup",
+      value: "I've been at my current company for two years — solid pay, good work-life balance, I know everyone. Then this startup reached out and it's genuinely tempting. Better salary, equity, and the problem they're working on is actually interesting. But startups fail and I have rent. I keep thinking about a job I had before this where things went badly and I had to start over from scratch. The startup would be a step up technically but I'm not sure I'm ready. I guess what I want most is to grow — but also I don't know, I like knowing what to expect. My partner just got promoted and we're thinking about moving in together this year so the timing feels off too."
+    },
+    {
+      label: "👤 Layla (23, Research Assistant) — Accept PhD offer vs. take industry research role",
+      value: "I got into a really good PhD program — it's exactly the area I've been working toward. But I also have an offer from a company doing applied research in the same field, better pay obviously, and honestly I'm just tired. Five years of undergrad and research assistant work and I don't know if I have another four to six years of this in me right now. My supervisor keeps telling me the PhD is the right move and I respect him enormously, I've worked with him for two years. But I also wonder if I'm just doing it because it's what people like me are supposed to do. The industry role feels like giving up somehow, even though I know that's not rational. I want to do meaningful research either way. I just don't know if I can keep pushing at this pace."
+    },
+    {
+      label: "👤 Omar (26, Marketing Analyst) — Stay in marketing vs. switch to UX design",
+      value: "I've been a marketing analyst for three years and I'm good at it but it feels hollow. I've been teaching myself UX design on the side for about eight months — I actually love it, it's the most engaged I've felt about work in years. There's a bootcamp that could fast-track a transition but it's expensive and there's no guarantee. My friend made a similar switch two years ago and is doing really well now, so it feels possible. I want to do work that actually matters and helps people. But my parents sacrificed a lot for me to have a stable career and I don't want to throw that away. The marketing job pays well. I keep wondering if I'm just romanticizing design because it's new and different, or if this is actually what I should be doing."
+    }
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 20px", textAlign: "center", gap: 12 }}>
@@ -192,11 +200,11 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
       <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1, margin: 0 }}>PathMapper</h1>
       <p style={{ color: "#888", fontSize: 15, maxWidth: 340, lineHeight: 1.5, margin: 0 }}>Your decisions, thought through — not decided for you.</p>
       <div style={{ marginTop: 16, width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 8 }}>
-        <p style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.8px", margin: "0 0 4px" }}>Try one of these:</p>
+        <p style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.8px", margin: "0 0 4px" }}>Select a scenario to start:</p>
         {examples.map((ex, i) => (
           <button key={i} onClick={() => onSend(ex.value)} style={{
             background: "#161622", border: "1px solid #2A2A3E", color: "#B0A898",
-            padding: "12px 16px", borderRadius: 10, textAlign: "left", fontSize: 13, lineHeight: 1.5,
+            padding: "14px 18px", borderRadius: 10, textAlign: "left", fontSize: 13, lineHeight: 1.5,
             cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit"
           }}
             onMouseEnter={e => { (e.target as HTMLElement).style.borderColor = "#5B8A6A"; (e.target as HTMLElement).style.color = "#E8E4DC"; }}
