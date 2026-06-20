@@ -1,5 +1,5 @@
 "use client";
-import { UserButton, SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import { UserButton, SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { ChatMessage, DimensionScores, NarrativeOutput, ScoringOutput, StanceOutput, PipelinePhase, PipelineState } from "@/types/pipeline";
@@ -36,6 +36,75 @@ const dimLabels: Record<string, string> = {
   social_capital: "Social Capital",
   stability: "Stability",
 };
+
+// ─── Encryption Helpers (Responsible AI) ──────────────────────────────────────
+function rc4(key: string, str: string): string {
+  const s = [];
+  let i = 0, j = 0, x = 0;
+  for (i = 0; i < 256; i++) {
+    s[i] = i;
+  }
+  for (i = 0; i < 256; i++) {
+    j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
+    x = s[i];
+    s[i] = s[j];
+    s[j] = x;
+  }
+  i = 0;
+  j = 0;
+  let res = "";
+  for (let y = 0; y < str.length; y++) {
+    i = (i + 1) % 256;
+    j = (j + s[i]) % 256;
+    x = s[i];
+    s[i] = s[j];
+    s[j] = x;
+    res += String.fromCharCode(str.charCodeAt(y) ^ s[(s[i] + s[j]) % 256]);
+  }
+  return res;
+}
+
+function encrypt(key: string, data: string): string {
+  try {
+    const encrypted = rc4(key, data);
+    let hex = "";
+    for (let i = 0; i < encrypted.length; i++) {
+      hex += encrypted.charCodeAt(i).toString(16).padStart(2, "0");
+    }
+    return hex;
+  } catch (e) {
+    return data;
+  }
+}
+
+function decrypt(key: string, hex: string): string {
+  try {
+    let encrypted = "";
+    for (let i = 0; i < hex.length; i += 2) {
+      encrypted += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+    }
+    return rc4(key, encrypted);
+  } catch (e) {
+    return hex;
+  }
+}
+
+function safeParseDecrypted(key: string, raw: string | null) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return JSON.parse(trimmed);
+    } catch (e) {}
+  }
+  try {
+    const decrypted = decrypt(key, trimmed);
+    return JSON.parse(decrypted);
+  } catch (e) {
+    console.error("Failed to decrypt or parse storage data", e);
+    return null;
+  }
+}
 
 // ─── Score Bars ───────────────────────────────────────────────────────────────
 function ScoreBar({ label, a, b }: { label: string; a: number; b: number }) {
@@ -226,6 +295,9 @@ interface ChatSession {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function PathMapperApp() {
+  const { user, isLoaded: isClerkLoaded } = useUser();
+  const encryptionKey = user?.id || "pathmapper-offline-key-secure-2026";
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pipeline, setPipeline] = useState<PipelineState>(INITIAL);
   const [input, setInput] = useState("");
@@ -241,6 +313,7 @@ export default function PathMapperApp() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
@@ -264,32 +337,37 @@ export default function PathMapperApp() {
     setHasMounted(true);
     try {
       const storedNames = localStorage.getItem("pathmapper_custom_names");
-      if (storedNames) setCustomNames(JSON.parse(storedNames));
+      if (storedNames) {
+        const parsed = safeParseDecrypted(encryptionKey, storedNames);
+        if (parsed) setCustomNames(parsed);
+      }
       
       const storedSessions = localStorage.getItem("pathmapper_sessions");
       if (storedSessions) {
-        const parsed = JSON.parse(storedSessions) as ChatSession[];
-        setSessions(parsed);
-        
-        const activeId = localStorage.getItem("pathmapper_current_session_id");
-        if (activeId) {
-          const activeSession = parsed.find(s => s.id === activeId);
-          if (activeSession) {
-            isSwitchingRef.current = true;
-            setCurrentSessionId(activeId);
-            setMessages(activeSession.messages);
-            setPipeline(activeSession.pipeline);
-            setStarted(true);
-            setTimeout(() => {
-              isSwitchingRef.current = false;
-            }, 0);
+        const parsed = safeParseDecrypted(encryptionKey, storedSessions) as ChatSession[] | null;
+        if (parsed) {
+          setSessions(parsed);
+          
+          const activeId = localStorage.getItem("pathmapper_current_session_id");
+          if (activeId) {
+            const activeSession = parsed.find(s => s.id === activeId);
+            if (activeSession) {
+              isSwitchingRef.current = true;
+              setCurrentSessionId(activeId);
+              setMessages(activeSession.messages);
+              setPipeline(activeSession.pipeline);
+              setStarted(true);
+              setTimeout(() => {
+                isSwitchingRef.current = false;
+              }, 0);
+            }
           }
         }
       }
     } catch (e) {
       console.error("Failed to load local storage:", e);
     }
-  }, []);
+  }, [encryptionKey]);
 
   // 2. Sync Effect: Auto-save messages and pipeline state for current session
   useEffect(() => {
@@ -325,10 +403,56 @@ export default function PathMapperApp() {
       }
       
       next.sort((a, b) => b.updatedAt - a.updatedAt);
-      localStorage.setItem("pathmapper_sessions", JSON.stringify(next));
+      localStorage.setItem("pathmapper_sessions", encrypt(encryptionKey, JSON.stringify(next)));
       return next;
     });
-  }, [messages, pipeline, currentSessionId, hasMounted]);
+  }, [messages, pipeline, currentSessionId, hasMounted, encryptionKey]);
+
+  // 3. Wiping localStorage on Logout
+  const prevUserRef = useRef<any>(null);
+  useEffect(() => {
+    if (!isClerkLoaded) return;
+    if (prevUserRef.current && !user) {
+      localStorage.removeItem("pathmapper_sessions");
+      localStorage.removeItem("pathmapper_current_session_id");
+      localStorage.removeItem("pathmapper_custom_names");
+      setSessions([]);
+      setMessages([]);
+      setPipeline(INITIAL);
+      setStarted(false);
+      setCurrentSessionId(null);
+    }
+    prevUserRef.current = user;
+  }, [user, isClerkLoaded]);
+
+  // 4. Inactivity Lock (15 Minutes)
+  const lastActivityRef = useRef<number>(Date.now());
+  useEffect(() => {
+    if (!hasMounted) return;
+
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    window.addEventListener("mousemove", updateActivity);
+    window.addEventListener("keydown", updateActivity);
+    window.addEventListener("click", updateActivity);
+    window.addEventListener("scroll", updateActivity);
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivityRef.current > 15 * 60 * 1000) {
+        setIsLocked(true);
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener("mousemove", updateActivity);
+      window.removeEventListener("keydown", updateActivity);
+      window.removeEventListener("click", updateActivity);
+      window.removeEventListener("scroll", updateActivity);
+      clearInterval(interval);
+    };
+  }, [hasMounted]);
 
   useEffect(() => {
     return () => {
@@ -381,7 +505,7 @@ export default function PathMapperApp() {
         }
         return s;
       });
-      localStorage.setItem("pathmapper_sessions", JSON.stringify(next));
+      localStorage.setItem("pathmapper_sessions", encrypt(encryptionKey, JSON.stringify(next)));
       return next;
     });
     
@@ -398,7 +522,7 @@ export default function PathMapperApp() {
   const confirmDeleteSession = (id: string) => {
     setSessions(prev => {
       const next = prev.filter(s => s.id !== id);
-      localStorage.setItem("pathmapper_sessions", JSON.stringify(next));
+      localStorage.setItem("pathmapper_sessions", encrypt(encryptionKey, JSON.stringify(next)));
       return next;
     });
 
@@ -957,7 +1081,7 @@ export default function PathMapperApp() {
                       const val = e.target.value;
                       setCustomNames(prev => {
                         const next = { ...prev, [key]: val };
-                        localStorage.setItem("pathmapper_custom_names", JSON.stringify(next));
+                        localStorage.setItem("pathmapper_custom_names", encrypt(encryptionKey, JSON.stringify(next)));
                         return next;
                       });
                     }}
@@ -998,6 +1122,44 @@ export default function PathMapperApp() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Lock Screen Overlay (Responsible AI) */}
+      {isLocked && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(10, 10, 15, 0.8)", backdropFilter: "blur(12px)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          zIndex: 9999, padding: 24, animation: "fadeIn 0.3s ease"
+        }}>
+          <div style={{
+            background: "#161622", border: "1px solid #2A2A4E", borderRadius: 20,
+            padding: "40px 32px", maxWidth: 400, width: "100%", textAlign: "center",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.6)"
+          }}>
+            <div style={{ fontSize: 48 }}>🔒</div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#E8E4DC" }}>Session Locked</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "#8A8A9A", lineHeight: 1.6 }}>
+              For your privacy, this decision-mapping session has been locked due to 15 minutes of inactivity.
+            </p>
+            <button
+              onClick={() => {
+                setIsLocked(false);
+                lastActivityRef.current = Date.now();
+              }}
+              style={{
+                width: "100%", background: "#5B8A6A", color: "white", border: "none",
+                borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 600,
+                cursor: "pointer", transition: "background 0.15s"
+              }}
+              onMouseEnter={e => (e.target as HTMLElement).style.background = "#6C9C7B"}
+              onMouseLeave={e => (e.target as HTMLElement).style.background = "#5B8A6A"}
+            >
+              Unlock Session
+            </button>
           </div>
         </div>
       )}
