@@ -21,12 +21,12 @@ const INITIAL: PipelineState = {
 };
 
 const PERSONAS = {
-  Sam: { defaultName: "Cora", color: "#8A8A9A", bg: "#16161F", emoji: "💬", subtitle: "the Coordinator" },
-  Dev: { defaultName: "Felix", color: "#E06B4E", bg: "#2A1512", emoji: "🎯", subtitle: "the Fact Checker" },
-  Mina: { defaultName: "Paige", color: "#D4839A", bg: "#2A1520", emoji: "🌸", subtitle: "the Pattern Detector" },
-  Theo: { defaultName: "Carter", color: "#4AAAA5", bg: "#122A28", emoji: "📋", subtitle: "the Categorizer" },
-  Priya: { defaultName: "Connie", color: "#9B7ED8", bg: "#1E162A", emoji: "🌙", subtitle: "the Confidence Meter" },
-  Jordan: { defaultName: "Blair", color: "#D4A843", bg: "#2A2210", emoji: "⚡", subtitle: "the Blindspot Finder" },
+  Sam: { defaultName: "Cora", color: "#25D366", bg: "#0D2818", emoji: "💬", subtitle: "the Coordinator" },
+  Dev: { defaultName: "Felix", color: "#FF6B6B", bg: "#2D0F0F", emoji: "🎯", subtitle: "the Fact Checker" },
+  Mina: { defaultName: "Paige", color: "#FFB347", bg: "#2D1A08", emoji: "🌸", subtitle: "the Pattern Detector" },
+  Theo: { defaultName: "Carter", color: "#4ECDC4", bg: "#0D2B28", emoji: "📋", subtitle: "the Categorizer" },
+  Priya: { defaultName: "Connie", color: "#A78BFA", bg: "#1F1640", emoji: "🌙", subtitle: "the Confidence Meter" },
+  Jordan: { defaultName: "Blair", color: "#FCD34D", bg: "#2D2408", emoji: "⚡", subtitle: "the Blindspot Finder" },
 } as const;
 
 const dimLabels: Record<string, string> = {
@@ -97,15 +97,15 @@ async function decryptAES(password: string, base64: string): Promise<string> {
 // ─── Score Bars ───────────────────────────────────────────────────────────────
 function ScoreBar({ label, a, b }: { label: string; a: number; b: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <div style={{ fontSize: 11, color: "#999", width: 120, flexShrink: 0 }}>{label}</div>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ flex: 1, height: 6, background: "#1E1E2E", borderRadius: 3, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${(a / 5) * 100}%`, background: "#3A6A9C", borderRadius: 3, transition: "width 0.6s ease" }} />
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: "10px 0" }}>
+      <div style={{ fontSize: 12, color: "#B0B9C3", width: 100, flexShrink: 0, fontWeight: 500 }}>{label}</div>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ flex: 1, height: 8, background: "#1F2937", borderRadius: 4, overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.5)" }}>
+          <div style={{ height: "100%", width: `${(a / 5) * 100}%`, background: "linear-gradient(90deg, #25D366, #1da851)", borderRadius: 4, transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)", boxShadow: "0 0 8px rgba(37, 211, 102, 0.4)" }} />
         </div>
-        <div style={{ fontSize: 10, color: "#777", width: 28, textAlign: "center", flexShrink: 0 }}>{a}:{b}</div>
-        <div style={{ flex: 1, height: 6, background: "#1E1E2E", borderRadius: 3, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${(b / 5) * 100}%`, background: "#9C7A3A", borderRadius: 3, transition: "width 0.6s ease" }} />
+        <div style={{ fontSize: 11, color: "#25D366", width: 32, textAlign: "center", flexShrink: 0, fontWeight: 600 }}>{a}:{b}</div>
+        <div style={{ flex: 1, height: 8, background: "#1F2937", borderRadius: 4, overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.5)" }}>
+          <div style={{ height: "100%", width: `${(b / 5) * 100}%`, background: "linear-gradient(90deg, #FF6B6B, #E63946)", borderRadius: 4, transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)", boxShadow: "0 0 8px rgba(255, 107, 107, 0.4)" }} />
         </div>
       </div>
     </div>
@@ -177,14 +177,15 @@ function StanceCard({ stance }: { stance: StanceOutput }) {
 // ─── Typing Dots ──────────────────────────────────────────────────────────────
 function TypingDots() {
   return (
-    <div style={{ display: "flex", gap: 5, padding: "14px 18px", background: "#161622", border: "1px solid #2A2A3E", borderRadius: "4px 18px 18px 18px", width: "fit-content" }}>
-      {[0, 200, 400].map((delay) => (
+    <div style={{ display: "flex", gap: 6, padding: "12px 14px", background: "#1F2937", border: "1px solid #374151", borderRadius: "18px 18px 4px 18px", width: "fit-content", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
+      {[0, 150, 300].map((delay) => (
         <span key={delay} style={{
-          width: 7, height: 7, background: "#555", borderRadius: "50%", display: "block",
-          animation: `dotBounce 1.2s ${delay}ms infinite`
+          width: 8, height: 8, background: "#9CA3AF", borderRadius: "50%", display: "block",
+          animation: `dotBounce 1.4s ${delay}ms infinite`,
+          boxShadow: "0 1px 2px rgba(0,0,0,0.4)"
         }} />
       ))}
-      <style>{`@keyframes dotBounce { 0%,60%,100%{transform:translateY(0);opacity:.4} 30%{transform:translateY(-5px);opacity:1} }`}</style>
+      <style>{`@keyframes dotBounce { 0%,60%,100%{transform:translateY(0);opacity:.5} 30%{transform:translateY(-6px);opacity:1} }`}</style>
     </div>
   );
 }
@@ -196,28 +197,35 @@ function ChatBubble({ msg, customNames }: { msg: ChatMessage; customNames: Recor
   const getFriendName = (name: string) => customNames[name] || (PERSONAS[name as keyof typeof PERSONAS] as any)?.defaultName || name;
 
   return (
-    <div style={{ display: "flex", gap: 10, maxWidth: "92%", alignSelf: isUser ? "flex-end" : "flex-start", flexDirection: isUser ? "row-reverse" : "row", animation: "fadeIn 0.2s ease" }}>
-      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    <div style={{ display: "flex", gap: 12, maxWidth: "92%", alignSelf: isUser ? "flex-end" : "flex-start", flexDirection: isUser ? "row-reverse" : "row", animation: "slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)" }}>
+      <style>{`
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       {!isUser && persona && (
         <div style={{
-          width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 16, flexShrink: 0, marginTop: 18, background: persona.bg, border: `2px solid ${persona.color}`
+          width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 18, flexShrink: 0, marginTop: 16, background: persona.bg, border: `2.5px solid ${persona.color}`,
+          boxShadow: `0 0 12px ${persona.color}33`
         }}>{persona.emoji}</div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {!isUser && msg.persona && (
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.3px", marginLeft: 2, color: persona?.color }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", marginLeft: 4, color: persona?.color, textTransform: "uppercase" }}>
             {getFriendName(msg.persona)}
           </div>
         )}
         <div style={{
           padding: "12px 16px",
-          borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
+          borderRadius: isUser ? "18px 4px 18px 18px" : "18px 18px 4px 18px",
           fontSize: 14, lineHeight: 1.6,
-          background: isUser ? "#2A4A3A" : (persona?.bg ?? "#161622"),
-          color: isUser ? "#D4EDDA" : "#E0D8D0",
-          border: `1px solid ${isUser ? "#3A6A4A33" : (persona ? persona.color + "44" : "#2A2A3E")}`,
+          background: isUser ? "#25D366" : (persona?.bg ?? "#111827"),
+          color: isUser ? "#ffffff" : "#E5E7EB",
+          border: `1px solid ${isUser ? "#1da85133" : (persona ? persona.color + "55" : "#374151")}`,
           maxWidth: msg.type === "narratives" ? 560 : undefined,
+          boxShadow: `0 1px 3px ${isUser ? "#00000020" : "#00000040"}`,
         }}>
           {msg.type === "narratives" && msg.metadata ? (
             <NarrativeCards
@@ -252,23 +260,34 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
     }
   ];
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 20px", textAlign: "center", gap: 12 }}>
-      <div style={{ fontSize: 52 }}>🗺️</div>
-      <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1, margin: 0 }}>PathMapper</h1>
-      <p style={{ color: "#888", fontSize: 15, maxWidth: 340, lineHeight: 1.5, margin: 0 }}>Your decisions, thought through — not decided for you.</p>
-      <div style={{ marginTop: 16, width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 8 }}>
-        <p style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.8px", margin: "0 0 4px" }}>Select a scenario to start:</p>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "40px 20px", textAlign: "center", gap: 16 }}>
+      <h1 style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, margin: 0, color: "#25D366", animation: "bounce 2s infinite" }}>🗺️ PathMapper</h1>
+      <p style={{ color: "#9CA3AF", fontSize: 16, maxWidth: 380, lineHeight: 1.6, margin: 0 }}>Your decisions, thought through — not decided for you. Meet your AI friends who debate every angle.</p>
+      <div style={{ marginTop: 24, width: "100%", maxWidth: 580, display: "flex", flexDirection: "column", gap: 10 }}>
+        <p style={{ fontSize: 12, color: "#6B7280", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 8px", fontWeight: 600 }}>Choose a scenario:</p>
         {examples.map((ex, i) => (
           <button key={i} onClick={() => onSend(ex.value)} style={{
-            background: "#161622", border: "1px solid #2A2A3E", color: "#B0A898",
-            padding: "14px 18px", borderRadius: 10, textAlign: "left", fontSize: 13, lineHeight: 1.5,
-            cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit"
+            background: "#1F2937", border: "1.5px solid #374151", color: "#D1D5DB",
+            padding: "16px 20px", borderRadius: 12, textAlign: "left", fontSize: 13, lineHeight: 1.6,
+            cursor: "pointer", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)", fontFamily: "inherit", fontWeight: 500,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
           }}
-            onMouseEnter={e => { (e.target as HTMLElement).style.borderColor = "#5B8A6A"; (e.target as HTMLElement).style.color = "#E8E4DC"; }}
-            onMouseLeave={e => { (e.target as HTMLElement).style.borderColor = "#2A2A3E"; (e.target as HTMLElement).style.color = "#B0A898"; }}
+            onMouseEnter={e => { 
+              (e.target as HTMLElement).style.borderColor = "#25D366"; 
+              (e.target as HTMLElement).style.backgroundColor = "#0D2818";
+              (e.target as HTMLElement).style.color = "#25D366";
+              (e.target as HTMLElement).style.boxShadow = "0 0 16px rgba(37, 211, 102, 0.2)";
+            }}
+            onMouseLeave={e => { 
+              (e.target as HTMLElement).style.borderColor = "#374151"; 
+              (e.target as HTMLElement).style.backgroundColor = "#1F2937";
+              (e.target as HTMLElement).style.color = "#D1D5DB";
+              (e.target as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.2)";
+            }}
           >{ex.label}</button>
         ))}
       </div>
+      <style>{`@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }`}</style>
     </div>
   );
 }
@@ -1037,10 +1056,10 @@ export default function PathMapperApp() {
       )}
 
       {/* MAIN CHAT AREA */}
-      <div className="main-chat-container" style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", background: "#0F0F16", borderLeft: "1px solid #1E1E2E", borderRight: "1px solid #1E1E2E", position: "relative" }}>
+      <div className="main-chat-container" style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", background: "#0F1419", borderLeft: "1px solid #1F2937", borderRight: "1px solid #1F2937", position: "relative" }}>
         
         {/* Authenticated Application Header Row */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #1E1E2E", flexShrink: 0 }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid #1F2937", flexShrink: 0, backgroundColor: "#111827", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
           {/* Left Side: App Title and Subtitle */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {/* Desktop Toggle Sidebar Button */}
@@ -1048,67 +1067,95 @@ export default function PathMapperApp() {
               onClick={() => setIsSidebarOpen(prev => !prev)}
               className="desktop-sidebar-toggle-btn"
               style={{
-                background: "none", border: "none", color: "#8A8A9A", cursor: "pointer",
-                padding: 6, display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: 6, transition: "background 0.15s, color 0.15s"
+                background: "none", border: "none", color: "#9CA3AF", cursor: "pointer",
+                padding: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 8, transition: "all 0.3s ease"
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = "#1C1C2C";
-                e.currentTarget.style.color = "#E8E4DC";
+                e.currentTarget.style.background = "#1F2937";
+                e.currentTarget.style.color = "#E5E7EB";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = "#8A8A9A";
+                e.currentTarget.style.color = "#9CA3AF";
               }}
               title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect width="18" height="18" x="3" y="3" rx="2" />
                 <path d="M9 3v18" />
               </svg>
             </button>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px", color: "#F3F4F6" }}>
                 <button
                   onClick={() => setShowHistoryDrawer(true)}
                   className="mobile-menu-btn"
-                  style={{ display: "none", background: "none", border: "none", color: "#E8E4DC", cursor: "pointer", fontSize: 18, padding: 0, marginRight: 4 }}
+                  style={{ display: "none", background: "none", border: "none", color: "#F3F4F6", cursor: "pointer", fontSize: 20, padding: 0, marginRight: 4 }}
                   aria-label="Open History"
                 >
                   ☰
                 </button>
                 <span>🗺️</span> PathMapper
-                <span style={{ fontSize: 11, background: "#1E2A3A", color: "#6A9FD8", padding: "2px 8px", borderRadius: 20, fontWeight: 600, letterSpacing: "0.5px" }}>BETA</span>
+                <span style={{ fontSize: 11, background: "rgba(37, 211, 102, 0.15)", color: "#25D366", padding: "4px 10px", borderRadius: 12, fontWeight: 700, letterSpacing: "0.8px", border: "1px solid rgba(37, 211, 102, 0.3)" }}>BETA</span>
               </div>
-              <span style={{ color: "#8A8A9A", fontSize: 12 }}>
-                Active friends: {getFriendName("Sam")}, {getFriendName("Dev")}, {getFriendName("Mina")}, {getFriendName("Theo")}, {getFriendName("Priya")}, {getFriendName("Jordan")}
+              <span style={{ color: "#9CA3AF", fontSize: 12, fontWeight: 500 }}>
+                Friends: {getFriendName("Sam")}, {getFriendName("Dev")}, {getFriendName("Mina")}, +3 more
               </span>
             </div>
           </div>
 
           {/* Right Side: Navigation Actions & Auth Layout */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
               onClick={() => {
                 setSettingsTab("names");
                 setShowEditModal(true);
               }}
-              style={{ background: "none", border: "1px solid #2A2A3E", color: "#B8B8C8", padding: "6px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+              style={{ background: "#1F2937", border: "1px solid #374151", color: "#D1D5DB", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease" }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#374151";
+                e.currentTarget.style.color = "#F3F4F6";
+                e.currentTarget.style.borderColor = "#4B5563";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "#1F2937";
+                e.currentTarget.style.color = "#D1D5DB";
+                e.currentTarget.style.borderColor = "#374151";
+              }}
             >
               ⚙️ Settings
             </button>
 
             {started && (
-              <button onClick={reset} style={{ background: "none", border: "1px solid #2A2A3E", color: "#888", padding: "6px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
-                New decision
+              <button onClick={reset} style={{ background: "#1F2937", border: "1px solid #374151", color: "#9CA3AF", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, transition: "all 0.3s ease" }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "#374151";
+                  e.currentTarget.style.color = "#E5E7EB";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "#1F2937";
+                  e.currentTarget.style.color = "#9CA3AF";
+                }}
+              >
+                ➕ New
               </button>
             )}
 
             {/* Display when the user is completely signed out */}
             <SignedOut>
               <SignInButton mode="modal">
-                <button style={{ background: "#5B8A6A", color: "white", border: "none", padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}>
+                <button style={{ background: "#25D366", color: "#ffffff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.3s ease", boxShadow: "0 2px 8px rgba(37, 211, 102, 0.3)" }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "#1da851";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(37, 211, 102, 0.4)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "#25D366";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(37, 211, 102, 0.3)";
+                  }}
+                >
                   Sign In
                 </button>
               </SignInButton>
